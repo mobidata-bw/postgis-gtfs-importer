@@ -1,0 +1,14 @@
+{
+	"private": true,
+	"name": "postgis-gtfs-importer",
+	"type": "module",
+	"main": "importer.js",
+	"engines": {
+		"node": ">=20"
+	},
+	"dependencies": {
+		"pg": "^8.11.3",
+		"pg-format": "^1.0.4",
+		"signal-exit": "^4.1.0"
+	}
+}
