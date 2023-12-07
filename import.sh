@@ -11,9 +11,8 @@ print_bold () {
 	fi
 }
 
-ua="${GTFS_DOWNLOAD_USER_AGENT:-IPL (MobiData-BW)}"
-bwgesamt='https://www.nvbw.de/fileadmin/user_upload/service/open_data/fahrplandaten_mit_liniennetz/bwgesamt.zip'
-gtfs_url="${GTFS_DOWNLOAD_URL:-$bwgesamt}"
+ua="${GTFS_DOWNLOAD_USER_AGENT:?'missing/empty $GTFS_DOWNLOAD_USER_AGENT'}"
+gtfs_url="${GTFS_DOWNLOAD_URL:?'missing/empty $GTFS_DOWNLOAD_URL'}"
 gtfs_tmp_dir="${GTFS_TMP_DIR:-/tmp/gtfs}"
 mkdir -p "$gtfs_tmp_dir"
 
@@ -82,10 +81,3 @@ done
 
 set +x
 print_bold 'Done!'
-
-cat <<EOF
-Run PostgREST with the following environment variables:'
-PGUSER=postgrest
-PGRST_DB_SCHEMAS=api
-PGRST_DB_ANON_ROLE=web_anon
-EOF
