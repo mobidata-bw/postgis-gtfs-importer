@@ -13,3 +13,27 @@ By default, the GTFS data is downloaded to, unzipped into and tidied in `/tmp/gt
 Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html) and acquires an exclusive lock on on `latest_import` in the beginning, it should be safe to cancel an import at any time, or to (accidentally) run more than one process in parallel.
 
 After the import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d`, if provided. This way, you can customise the imported data.
+
+
+## Usage
+
+The following commands demonstrate how to use the importer using Docker.
+
+```shell
+mkdir gtfs-tmp
+docker run --rm -it \
+	-v $PWD/gtfs-tmp:/tmp/gtfs \
+	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
+	-e 'GTFS_DOWNLOAD_URL=…' \
+	ghcr.io/mobidata-bw/postgis-gtfs-importer
+```
+
+*Note:* We mount a `gtfs-tmp` directory to prevent it from re-downloading the GTFS dataset every time, even when it hasn't changed.
+
+You can configure access to the PostgreSQL by passing the [standard `PG*` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html) into the container.
+
+### writing a DSN file
+
+If you set `$PATH_TO_DSN_FILE` to a file path, the importer will also write a [PostgreSQL key/value connection string (DSN)](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) to that path. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
+
+This feature is intended to be used with [PgBouncer](https://pgbouncer.org) for "dynamic" routing of PostgreSQL clients to the database containing the latest GTFS import.
