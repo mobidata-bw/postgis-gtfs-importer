@@ -12,7 +12,7 @@ By default, the GTFS data is downloaded to, unzipped into and tidied in `/tmp/gt
 
 Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html) and acquires an exclusive lock on on `latest_import` in the beginning, it should be safe to cancel an import at any time, or to (accidentally) run more than one process in parallel.
 
-After the import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d`, if provided. This way, you can customise the imported data.
+After the import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data.
 
 
 ## Usage

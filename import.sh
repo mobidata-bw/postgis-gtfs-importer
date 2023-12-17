@@ -20,6 +20,8 @@ zip_path="$gtfs_tmp_dir/gtfs.zip"
 extracted_path="$gtfs_tmp_dir/gtfs"
 tidied_path="$gtfs_tmp_dir/tidied.gtfs"
 
+sql_d_path="${GTFS_SQL_D_PATH:-'/etc/gtfs/sql.d'}"
+
 print_bold "Downloading & extracting the GTFS feed from $GTFS_DOWNLOAD_URL."
 set -x
 
@@ -72,10 +74,10 @@ gtfs-to-sql -d \
 	| psql -b -v 'ON_ERROR_STOP=1'
 
 set +x
-print_bold "Running custom post-processing SQL scripts in /etc/gtfs/sql.d."
+print_bold "Running custom post-processing SQL scripts in $sql_d_path."
 set -x
 
-for file in /etc/gtfs/sql.d/*; do
+for file in "$sql_d_path/"*; do
 	psql -b -v 'ON_ERROR_STOP=1' -f "$file"
 done
 
