@@ -77,9 +77,11 @@ set +x
 print_bold "Running custom post-processing SQL scripts in $sql_d_path."
 set -x
 
-for file in "$sql_d_path/"*; do
-	psql -b -v 'ON_ERROR_STOP=1' -f "$file"
-done
+if [ -d "$sql_d_path" ]; then
+	for file in "$sql_d_path/"*; do
+		psql -b -v 'ON_ERROR_STOP=1' -f "$file"
+	done
+fi
 
 set +x
 print_bold 'Done!'
