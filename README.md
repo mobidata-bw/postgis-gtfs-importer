@@ -6,15 +6,15 @@ The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.co
 
 ## How it works
 
-The importer uses [gtfstidy](https://github.com/patrickbr/gtfstidy) to clean up the GTFS dataset before importing it.
+First, the GTFS data is downloaded to, unzipped into and [tidied](https://github.com/patrickbr/gtfstidy) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
 
-By default, the GTFS data is downloaded to, unzipped into and tidied in `/tmp/gtfs`, but you can specify a custom path using `$GTFS_TMP_DIR`.
+**Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp`. The importer keeps track of the latest import by – once an import has succeeded – writing its DB name into a table `latest_import` within a "meta bookkeeping database".
 
-**Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp`. The importer keeps track of all databases with this naming schema in a "meta table" `latest_import` in a "meta database"; After a successful import, **deletes all of them but the most recent two**; This ensures that your disk won't overflow but that a rollback to the previous import is always possible.
+Before each import, it also **deletes all imports but the most recent two**; This ensures that your disk won't overflow but that a rollback to the previous import is always possible.
 
-Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html) and acquires an exclusive lock on on `latest_import` in the beginning, it should be safe to cancel an import at any time, or to (accidentally) run more than one process in parallel.
+Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html), and because it acquires an exclusive lock on on `latest_import` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up before the next import (see above).
 
-After the import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data.
+After the actual import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data.
 
 
 ## Usage
