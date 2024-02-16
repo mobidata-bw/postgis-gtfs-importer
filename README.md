@@ -1,6 +1,8 @@
 # PostGIS GTFS importer
 
-From this repo, the [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.com/mobidata-bw/postgis-gtfs-importer/pkgs/container/postgis-gtfs-importer) is built, which **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://www.postgis.net) database using [gtfs-via-postgres](https://github.com/public-transport/gtfs-via-postgres)**.
+This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. By working as [atomically](https://en.wikipedia.org/wiki/Atomicity_(database_systems)) as possible with PostgreSQL, it allows production systems to periodically import the latest GTFS data automatically in a *robust* way.
+
+The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.com/mobidata-bw/postgis-gtfs-importer/pkgs/container/postgis-gtfs-importer) is built automatically from this repo.
 
 ## How it works
 
