@@ -136,7 +136,8 @@ try {
 		ok(POSTGREST_PASSWORD, 'missing/empty $POSTGREST_PASSWORD')
 
 		const dsn = `gtfs=host=${PGHOST} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD}`
-		console.info(`writing "${dsn}" into env file ${PATH_TO_DSN_FILE}`)
+		const logDsn = `gtfs=host=${PGHOST} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD.slice(0, 2)}…${POSTGREST_PASSWORD.slice(-2)}`
+		console.info(`writing "${logDsn}" into env file ${PATH_TO_DSN_FILE}`)
 		await writeFile(PATH_TO_DSN_FILE, dsn)
 	}
 
