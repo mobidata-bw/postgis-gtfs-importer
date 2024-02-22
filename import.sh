@@ -20,7 +20,7 @@ zip_path="$gtfs_tmp_dir/gtfs.zip"
 extracted_path="$gtfs_tmp_dir/gtfs"
 tidied_path="$gtfs_tmp_dir/tidied.gtfs"
 
-sql_d_path="${GTFS_SQL_D_PATH:-'/etc/gtfs/sql.d'}"
+sql_d_path="${GTFS_SQL_D_PATH:-/etc/gtfs/sql.d}"
 
 print_bold "Downloading & extracting the GTFS feed from $GTFS_DOWNLOAD_URL."
 set -x
