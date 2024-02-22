@@ -70,8 +70,10 @@ await client.query(`\
 await client.query('BEGIN')
 try {
 	console.info('obtaining exclusive lock on "latest_import", so that only one import can be running')
-	// https://www.postgresql.org/docs/current/sql-lock.html
-	await client.query('LOCK TABLE latest_import IN ACCESS EXCLUSIVE MODE NOWAIT')
+	// https://www.postgresql.org/docs/14/explicit-locking.html#LOCKING-TABLES
+	// > Conflicts with the ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. This mode allows only concurrent ACCESS SHARE locks, i.e., only reads from the table can proceed in parallel with a transaction holding this lock mode.
+	//> Only an ACCESS EXCLUSIVE lock blocks a SELECT (without FOR UPDATE/SHARE) statement.
+	await client.query('LOCK TABLE latest_import IN EXCLUSIVE MODE NOWAIT')
 	
 	console.info('')
 
