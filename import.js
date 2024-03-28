@@ -39,25 +39,52 @@ const pSpawn = (path, args = [], opts = {}) => {
 const importGtfsAtomically = async (cfg) => {
 	const {
 		logger,
+		pgHost, pgUser, pgPassword, pgMetaDatabase,
 		databaseNamePrefix,
 		pathToImportScript,
 		pathToDsnFile,
+		gtfsDownloadUrl,
+		gtfsDownloadUserAgent,
+		gtfstidyBeforeImport,
+		gtfsSqlDPath,
 	} = {
 		logger: console,
+		pgHost: null,
+		pgUser: null,
+		pgPassword: null,
+		pgMetaDatabase: process.env.PGDATABASE || null,
 		pathToImportScript: PATH_TO_IMPORT_SCRIPT,
 		pathToDsnFile: process.env.GTFS_IMPORTER_DSN_FILE || null,
+		gtfsDownloadUrl: null,
+		gtfsDownloadUserAgent: null,
+		gtfstidyBeforeImport: null, // or `true` or `false`
+		gtfsSqlDPath: null,
 		...cfg,
 	}
 	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
 	ok(pathToImportScript, 'missing/empty cfg.pathToImportScript')
 
+	const pgConfig = {}
+	if (pgHost !== null) {
+		pgConfig.host = pgHost
+	}
+	if (pgUser !== null) {
+		pgConfig.user = pgUser
+	}
+	if (pgPassword !== null) {
+		pgConfig.password = pgPassword
+	}
+	if (pgMetaDatabase !== null) {
+		pgConfig.database = pgMetaDatabase
+	}
+
 	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
 	// have to drop it manually when cleaning up failed/aborted imports.
-	const dbMngmtClient = new Client()
+	const dbMngmtClient = new Client(pgConfig)
 	await dbMngmtClient.connect()
 
-	const client = new Client()
+	const client = new Client(pgConfig)
 	await client.connect()
 
 	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
@@ -113,12 +140,34 @@ const importGtfsAtomically = async (cfg) => {
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
 
 		logger.info(`importing data into "${dbName}"\n`)
+		const _importEnv = {
+			...process.env,
+			PGDATABASE: dbName,
+		}
+		if (pgHost !== null) {
+			_importEnv.PGHOST = pgHost
+		}
+		if (pgUser !== null) {
+			_importEnv.PGUSER = pgUser
+		}
+		if (pgPassword !== null) {
+			_importEnv.PGPASSWORD = pgPassword
+		}
+		if (gtfsDownloadUrl !== null) {
+			_importEnv.GTFS_DOWNLOAD_URL = gtfsDownloadUrl
+		}
+		if (gtfsDownloadUserAgent !== null) {
+			_importEnv.GTFS_DOWNLOAD_USER_AGENT = gtfsDownloadUserAgent
+		}
+		if (gtfstidyBeforeImport !== null) {
+			_importEnv.GTFSTIDY_BEFORE_IMPORT = String(gtfstidyBeforeImport)
+		}
+		if (gtfsSqlDPath !== null) {
+			_importEnv.GTFS_SQL_D_PATH = gtfsSqlDPath
+		}
 		await pSpawn(pathToImportScript, [], {
 			stdio: 'inherit',
-			env: {
-				...process.env,
-				PGDATABASE: dbName,
-			},
+			env: _importEnv,
 		})
 
 		logger.info(`\nmarking the import into "${dbName}" as the latest`)
