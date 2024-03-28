@@ -36,6 +36,8 @@ docker run --rm -it \
 
 You can configure access to the PostgreSQL by passing the [standard `PG*` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html) into the container.
 
+If you run `GTFSTIDY_BEFORE_IMPORT=false`, gtfstidy will not be used.
+
 ### writing a DSN file
 
 If you set `$PATH_TO_DSN_FILE` to a file path, the importer will also write a [PostgreSQL key/value connection string (DSN)](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) to that path. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.

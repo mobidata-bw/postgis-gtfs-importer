@@ -47,23 +47,25 @@ if [[ -f '/etc/gtfs/preprocess.sh' ]]; then
 	/etc/gtfs/preprocess.sh "$gtfs_path"
 fi
 
-set +x
-print_bold "Tidying GTFS feed using gtfstidy."
-set -x
+if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
+	set +x
+	print_bold "Tidying GTFS feed using gtfstidy."
+	set -x
 
-# Remove any leftovers from previous runs (e.g. pathways.txt/levels.txt)
-rm -rf "$tidied_path"
-# Instead of --Compress, which is shorthand for -OSRCcIAPdT, we use --OSRCcIAPT (no id minimisation)
-# Note: in later versions of gtfstidy, --keep-ids and --keep-additional-fields are introduced
-gtfstidy \
-	--show-warnings \
-	-OSRCcIAPT \
-	--fix \
-	--min-shapes \
-	-o "$tidied_path" \
-	"$gtfs_path" \
-	2>&1 | tee "$gtfs_tmp_dir/tidied.gtfs.gtfstidy-log.txt"
-gtfs_path="$tidied_path"
+	# Remove any leftovers from previous runs (e.g. pathways.txt/levels.txt)
+	rm -rf "$tidied_path"
+	# Instead of --Compress, which is shorthand for -OSRCcIAPdT, we use --OSRCcIAPT (no id minimisation)
+	# Note: in later versions of gtfstidy, --keep-ids and --keep-additional-fields are introduced
+	gtfstidy \
+		--show-warnings \
+		-OSRCcIAPT \
+		--fix \
+		--min-shapes \
+		-o "$tidied_path" \
+		"$gtfs_path" \
+		2>&1 | tee "$gtfs_tmp_dir/tidied.gtfs.gtfstidy-log.txt"
+	gtfs_path="$tidied_path"
+fi
 
 set +x
 print_bold "Importing GTFS feed into the $PGDATABASE database."
