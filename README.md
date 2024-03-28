@@ -1,6 +1,8 @@
 # PostGIS GTFS importer
 
-This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. By working as [atomically](https://en.wikipedia.org/wiki/Atomicity_(database_systems)) as possible with PostgreSQL, it allows production systems to periodically import the latest GTFS data automatically in a *robust* way.
+This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. It allows running a production service (e.g. API) on top of programmatically re-imported data from a periodically changing GTFS feed without downtime.
+
+Because it works as [atomically](https://en.wikipedia.org/wiki/Atomicity_(database_systems)) as possible with PostgreSQL, it makes the import pipeline *robust*, even if an import fails or if simultaneous imports get started.
 
 The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.com/mobidata-bw/postgis-gtfs-importer/pkgs/container/postgis-gtfs-importer) is built automatically from this repo.
 
@@ -12,9 +14,9 @@ First, the GTFS data is downloaded to, unzipped into and [tidied](https://github
 
 Before each import, it also **deletes all imports but the most recent two**; This ensures that your disk won't overflow but that a rollback to the previous import is always possible.
 
-Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html), and because it acquires an exclusive lock on on `latest_import` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up before the next import (see above).
+Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/14/explicit-locking.html) on on `latest_import` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up as part of the next import (see above).
 
-After the actual import, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data.
+After the GTFS has been imported but before the import is marked as successful, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction as the GTFS import.
 
 
 ## Usage
