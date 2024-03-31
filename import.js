@@ -82,6 +82,13 @@ const importGtfsAtomically = async (cfg) => {
 	ok(gtfsDownloadUrl, 'missing/empty cfg.gtfsDownloadUrl')
 	ok(gtfsDownloadUserAgent, 'missing/empty cfg.gtfsDownloadUserAgent')
 
+	const result = {
+		downloadDurationMs: null,
+		importSkipped: false,
+		databaseName: null,
+		importDurationMs: null,
+	}
+
 	const pgConfig = {}
 	if (pgHost !== null) {
 		pgConfig.host = pgHost
@@ -99,6 +106,7 @@ const importGtfsAtomically = async (cfg) => {
 	// todo: DRY with lib.sh
 	const zipPath = `${tmpDir}/gtfs.zip`
 	logger.info(`downloading data to "${zipPath}"\n`)
+	const _t0Download = performance.now()
 	await pSpawn(pathToDownloadScript, [], {
 		stdio: 'inherit',
 		env: {
@@ -108,6 +116,7 @@ const importGtfsAtomically = async (cfg) => {
 			GTFS_DOWNLOAD_USER_AGENT: gtfsDownloadUserAgent,
 		},
 	})
+	result.downloadDurationMs = performance.now() - _t0Download
 
 	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
@@ -173,9 +182,11 @@ const importGtfsAtomically = async (cfg) => {
 			zipDigest,
 		].join('')
 		if (prevImport?.slice(-DIGEST_LENGTH) === zipDigest) {
+			result.importSkipped = true
 			logger.info('GTFS feed digest has not changed, skipping import')
-			return;
+			return result
 		}
+		result.databaseName = dbName
 
 		logger.debug(`creating database "${dbName}"`)
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
@@ -201,10 +212,12 @@ const importGtfsAtomically = async (cfg) => {
 		if (gtfsSqlDPath !== null) {
 			_importEnv.GTFS_SQL_D_PATH = gtfsSqlDPath
 		}
+		const _t0Import = performance.now()
 		await pSpawn(pathToImportScript, [], {
 			stdio: 'inherit',
 			env: _importEnv,
 		})
+		result.importDurationMs = performance.now() - _t0Import
 
 		logger.info(`\nmarking the import into "${dbName}" as the latest`)
 		await client.query(`\
@@ -242,6 +255,8 @@ const importGtfsAtomically = async (cfg) => {
 		dbMngmtClient.end()
 		client.end()
 	}
+
+	return result
 }
 
 export {
