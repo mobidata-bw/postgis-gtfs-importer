@@ -32,6 +32,7 @@ set -x
 # see https://gist.github.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a
 curl-mirror \
 	--tmp-prefix "$zip_path.mirror-" \
+	--times \
 	"$gtfs_url" "$zip_path" \
 	-- \
 	-H "User-Agent: $ua"
