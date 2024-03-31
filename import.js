@@ -172,6 +172,10 @@ const importGtfsAtomically = async (cfg) => {
 			'_',
 			zipDigest,
 		].join('')
+		if (prevImport?.slice(-DIGEST_LENGTH) === zipDigest) {
+			logger.info('GTFS feed digest has not changed, skipping import')
+			return;
+		}
 
 		logger.debug(`creating database "${dbName}"`)
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
@@ -234,10 +238,10 @@ const importGtfsAtomically = async (cfg) => {
 		// The newly created DB will remain, potentially with data inside. But it will be cleaned up during the next run.
 		await client.query('ROLLBACK')
 		throw err
+	} finally {
+		dbMngmtClient.end()
+		client.end()
 	}
-
-	dbMngmtClient.end()
-	client.end()
 }
 
 export {
