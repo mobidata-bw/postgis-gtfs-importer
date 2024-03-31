@@ -8,10 +8,11 @@ import {ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
+const PATH_TO_DOWNLOAD_SCRIPT = fileURLToPath(new URL('download.sh', import.meta.url).href)
 
 const pSpawn = (path, args = [], opts = {}) => {
 	return new Promise((resolve, reject) => {
-		const proc = spawn(PATH_TO_IMPORT_SCRIPT, args, opts)
+		const proc = spawn(path, args, opts)
 		// https://github.com/sindresorhus/execa/blob/f4b8b3ab601c94d1503f1010822952758dcc6350/lib/kill.js#L95-L101
 		const stopListening = onExit(() => {
 			proc.kill()
@@ -25,7 +26,7 @@ const pSpawn = (path, args = [], opts = {}) => {
 			if (code === 0) {
 				resolve()
 			} else {
-				const err = new Error(`${PATH_TO_IMPORT_SCRIPT} exited with ${code} (${signal})`)
+				const err = new Error(`${path} exited with ${code} (${signal})`)
 				err.code = code
 				err.signal = signal
 				err.proc = proc
@@ -42,9 +43,11 @@ const importGtfsAtomically = async (cfg) => {
 		pgHost, pgUser, pgPassword, pgMetaDatabase,
 		databaseNamePrefix,
 		pathToImportScript,
+		pathToDownloadScript,
 		pathToDsnFile,
 		gtfsDownloadUrl,
 		gtfsDownloadUserAgent,
+		tmpDir,
 		gtfstidyBeforeImport,
 		gtfsSqlDPath,
 	} = {
@@ -54,15 +57,19 @@ const importGtfsAtomically = async (cfg) => {
 		pgPassword: null,
 		pgMetaDatabase: process.env.PGDATABASE || null,
 		pathToImportScript: PATH_TO_IMPORT_SCRIPT,
+		pathToDownloadScript: PATH_TO_DOWNLOAD_SCRIPT,
 		pathToDsnFile: process.env.GTFS_IMPORTER_DSN_FILE || null,
 		gtfsDownloadUrl: null,
 		gtfsDownloadUserAgent: null,
+		tmpDir: '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
 		gtfsSqlDPath: null,
 		...cfg,
 	}
 	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
 	ok(pathToImportScript, 'missing/empty cfg.pathToImportScript')
+	ok(gtfsDownloadUrl, 'missing/empty cfg.gtfsDownloadUrl')
+	ok(gtfsDownloadUserAgent, 'missing/empty cfg.gtfsDownloadUserAgent')
 
 	const pgConfig = {}
 	if (pgHost !== null) {
@@ -77,6 +84,19 @@ const importGtfsAtomically = async (cfg) => {
 	if (pgMetaDatabase !== null) {
 		pgConfig.database = pgMetaDatabase
 	}
+
+	// todo: DRY with lib.sh
+	const zipPath = `${tmpDir}/gtfs.zip`
+	logger.info(`downloading data to "${zipPath}"\n`)
+	await pSpawn(pathToDownloadScript, [], {
+		stdio: 'inherit',
+		env: {
+			...process.env,
+			GTFS_TMP_DIR: tmpDir,
+			GTFS_DOWNLOAD_URL: gtfsDownloadUrl,
+			GTFS_DOWNLOAD_USER_AGENT: gtfsDownloadUserAgent,
+		},
+	})
 
 	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
@@ -143,6 +163,7 @@ const importGtfsAtomically = async (cfg) => {
 		const _importEnv = {
 			...process.env,
 			PGDATABASE: dbName,
+			GTFS_TMP_DIR: tmpDir,
 		}
 		if (pgHost !== null) {
 			_importEnv.PGHOST = pgHost
@@ -152,12 +173,6 @@ const importGtfsAtomically = async (cfg) => {
 		}
 		if (pgPassword !== null) {
 			_importEnv.PGPASSWORD = pgPassword
-		}
-		if (gtfsDownloadUrl !== null) {
-			_importEnv.GTFS_DOWNLOAD_URL = gtfsDownloadUrl
-		}
-		if (gtfsDownloadUserAgent !== null) {
-			_importEnv.GTFS_DOWNLOAD_USER_AGENT = gtfsDownloadUserAgent
 		}
 		if (gtfstidyBeforeImport !== null) {
 			_importEnv.GTFSTIDY_BEFORE_IMPORT = String(gtfstidyBeforeImport)

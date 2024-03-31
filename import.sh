@@ -4,38 +4,14 @@ set -u
 set -E # abort if subshells fail
 set -o pipefail
 
-print_bold () {
-	if [ -t 0 ]; then
-		echo "$(tput bold)$1$(tput sgr0)"
-	else
-		echo "$1"
-	fi
-}
+source "$(dirname "$(realpath "$0")")/lib.sh"
 
-ua="${GTFS_DOWNLOAD_USER_AGENT:?'missing/empty $GTFS_DOWNLOAD_USER_AGENT'}"
-gtfs_url="${GTFS_DOWNLOAD_URL:?'missing/empty $GTFS_DOWNLOAD_URL'}"
-gtfs_tmp_dir="${GTFS_TMP_DIR:-/tmp/gtfs}"
-mkdir -p "$gtfs_tmp_dir"
-
-zip_path="$gtfs_tmp_dir/gtfs.zip"
-extracted_path="$gtfs_tmp_dir/gtfs"
-tidied_path="$gtfs_tmp_dir/tidied.gtfs"
 gtfs_path=''
 
 sql_d_path="${GTFS_SQL_D_PATH:-/etc/gtfs/sql.d}"
 
-print_bold "Downloading & extracting the GTFS feed from $GTFS_DOWNLOAD_URL."
+print_bold "Extracting the GTFS feed."
 set -x
-
-# custom curl-based HTTP mirroring/download script
-# > curl-mirror [--tmp-prefix …] [--log-level …] [--debug-curl] <url> <dest-path> [-- curl-opts...]
-# see https://gist.github.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a
-curl-mirror \
-	--tmp-prefix "$zip_path.mirror-" \
-	--times \
-	"$gtfs_url" "$zip_path" \
-	-- \
-	-H "User-Agent: $ua"
 
 rm -rf "$extracted_path"
 unzip -d "$extracted_path" "$zip_path"
