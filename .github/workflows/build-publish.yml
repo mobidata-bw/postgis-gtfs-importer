@@ -25,14 +25,14 @@ jobs:
     - name: compute Docker image tag
       id: docker-tags
       run: |
-        echo "permanent-tag=$(date +"%Y-%m-%dT%H.%M.%S")-${GITHUB_SHA:0:7}" >>$GITHUB_OUTPUT
+        echo "permanent-tag=v3-$(date +"%Y-%m-%dT%H.%M.%S")-${GITHUB_SHA:0:7}" >>$GITHUB_OUTPUT
 
     - name: build and push Docker image
       uses: docker/build-push-action@v5
       with:
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:2
+          ghcr.io/${{ github.repository }}:v3
           ghcr.io/${{ github.repository }}:${{ steps.docker-tags.outputs.permanent-tag }}
         platforms: linux/amd64
         # https://docs.docker.com/build/ci/github-actions/cache/#cache-backend-api
