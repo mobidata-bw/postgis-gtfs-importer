@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto'
+import {createReadStream} from 'node:fs'
 import {spawn} from 'node:child_process'
 import {onExit} from 'signal-exit'
 import {fileURLToPath} from 'node:url'
@@ -9,6 +11,15 @@ import {writeFile} from 'node:fs/promises'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
 const PATH_TO_DOWNLOAD_SCRIPT = fileURLToPath(new URL('download.sh', import.meta.url).href)
+
+const DIGEST_LENGTH = 6
+const digestFile = async (pathToFile) => {
+	const hash = createHash('sha256')
+	for await (const chunk of createReadStream(pathToFile)) {
+		hash.update(chunk)
+	}
+	return hash.digest('hex').slice(0, DIGEST_LENGTH).toLowerCase()
+}
 
 const pSpawn = (path, args = [], opts = {}) => {
 	return new Promise((resolve, reject) => {
@@ -146,7 +157,7 @@ const importGtfsAtomically = async (cfg) => {
 			const dbsToCleanUp = res.rows
 			.map(r => r.db_name)
 			.filter(dbName => dbName.slice(0, databaseNamePrefix.length) === databaseNamePrefix)
-			.filter(dbName => /^\d+$/.test(dbName.slice(databaseNamePrefix.length)))
+			.filter(dbName => new RegExp(`^\\d{10,}_[0-9a-f]{${DIGEST_LENGTH}}$`).test(dbName.slice(databaseNamePrefix.length)))
 
 			for (const dbName of dbsToCleanUp) {
 				logger.info(`dropping database "${dbName}" containing an older or unfinished import`)
@@ -154,7 +165,13 @@ const importGtfsAtomically = async (cfg) => {
 			}
 		}
 
-		const dbName = databaseNamePrefix + (Date.now() / 1000 | 0)
+		const zipDigest = await digestFile(zipPath)
+		const dbName = [
+			databaseNamePrefix,
+			(Date.now() / 1000 | 0),
+			'_',
+			zipDigest,
+		].join('')
 
 		logger.debug(`creating database "${dbName}"`)
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))

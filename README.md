@@ -10,7 +10,7 @@ The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.co
 
 First, the GTFS data is downloaded to, unzipped into and [tidied](https://github.com/patrickbr/gtfstidy) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
 
-**Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp`. The importer keeps track of the latest import by – once an import has succeeded – writing its DB name into a table `latest_import` within a "meta bookkeeping database".
+**Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of the latest import by – once an import has succeeded – writing the import's DB name into a table `latest_import` within a "meta bookkeeping database".
 
 Before each import, it also **deletes all imports but the most recent two**; This ensures that your disk won't overflow but that a rollback to the previous import is always possible.
 
