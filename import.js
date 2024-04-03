@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url'
 import _pg from 'pg'
 const {Client} = _pg
 import pgFormat from 'pg-format'
-import {ok} from 'node:assert'
+import {fail, ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
@@ -60,6 +60,7 @@ const importGtfsAtomically = async (cfg) => {
 		gtfsDownloadUserAgent,
 		tmpDir,
 		gtfstidyBeforeImport,
+		determineDbsToRetain,
 		gtfsSqlDPath,
 	} = {
 		logger: console,
@@ -74,6 +75,7 @@ const importGtfsAtomically = async (cfg) => {
 		gtfsDownloadUserAgent: null,
 		tmpDir: '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
+		determineDbsToRetain: oldDbs => oldDbs, // all
 		gtfsSqlDPath: null,
 		...cfg,
 	}
@@ -84,6 +86,8 @@ const importGtfsAtomically = async (cfg) => {
 
 	const result = {
 		downloadDurationMs: null,
+		deletedDatabases: [],
+		retainedDatabases: null,
 		importSkipped: false,
 		databaseName: null,
 		importDurationMs: null,
@@ -148,7 +152,7 @@ const importGtfsAtomically = async (cfg) => {
 
 		logger.debug('checking previous imports')
 
-		const {
+		let {
 			rows: [{
 				db_name: prevImport,
 			}],
@@ -161,16 +165,32 @@ const importGtfsAtomically = async (cfg) => {
 			const res = await client.query(`\
 				SELECT datname AS db_name
 				FROM pg_catalog.pg_database
-				WHERE datname != $1
-			`, [prevImport])
-			const dbsToCleanUp = res.rows
+				ORDER BY datname ASC
+			`)
+			const oldDbs = res.rows
 			.map(r => r.db_name)
 			.filter(dbName => dbName.slice(0, databaseNamePrefix.length) === databaseNamePrefix)
 			.filter(dbName => new RegExp(`^\\d{10,}_[0-9a-f]{${DIGEST_LENGTH}}$`).test(dbName.slice(databaseNamePrefix.length)))
+			logger.debug('old DBs, including previous import: ' + oldDbs.join(', '))
+			if (prevImport && !oldDbs.includes(prevImport)) {
+				logger.warn(`The latest_import table points to a database "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
+				prevImport = null
+			}
 
-			for (const dbName of dbsToCleanUp) {
+			const dbsToRetain = determineDbsToRetain(oldDbs)
+			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
+			if (prevImport && !dbsToRetain.includes(prevImport)) {
+				fail(`determineDbsToRetain() must retain the previous import "${prevImport.name}"`)
+			}
+			result.retainedDatabases = dbsToRetain
+
+			for (const dbName of oldDbs) {
+				if (dbsToRetain.includes(dbName)) {
+					continue;
+				}
 				logger.info(`dropping database "${dbName}" containing an older or unfinished import`)
 				await dbMngmtClient.query(pgFormat('DROP DATABASE %I', dbName))
+				result.deletedDatabases.push(dbName)
 			}
 		}
 
