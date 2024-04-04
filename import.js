@@ -53,6 +53,7 @@ const importGtfsAtomically = async (cfg) => {
 		logger,
 		pgHost, pgUser, pgPassword, pgMetaDatabase,
 		databaseNamePrefix,
+		schemaName,
 		pathToImportScript,
 		pathToDownloadScript,
 		pathToDsnFile,
@@ -68,6 +69,7 @@ const importGtfsAtomically = async (cfg) => {
 		pgUser: null,
 		pgPassword: null,
 		pgMetaDatabase: process.env.PGDATABASE || null,
+		schemaName: process.env.GTFS_IMPORTER_SCHEMA || null,
 		pathToImportScript: PATH_TO_IMPORT_SCRIPT,
 		pathToDownloadScript: PATH_TO_DOWNLOAD_SCRIPT,
 		pathToDsnFile: process.env.GTFS_IMPORTER_DSN_FILE || null,
@@ -225,6 +227,9 @@ const importGtfsAtomically = async (cfg) => {
 		}
 		if (pgPassword !== null) {
 			_importEnv.PGPASSWORD = pgPassword
+		}
+		if (schemaName !== null) {
+			_importEnv.GTFS_IMPORTER_SCHEMA = schemaName
 		}
 		if (gtfstidyBeforeImport !== null) {
 			_importEnv.GTFSTIDY_BEFORE_IMPORT = String(gtfstidyBeforeImport)

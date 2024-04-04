@@ -54,7 +54,8 @@ gtfs-to-sql -d \
 	--trips-without-shape-id --lower-case-lang-codes \
 	--stops-location-index \
 	--import-metadata \
-	--schema api --postgrest \
+	--schema "${GTFS_IMPORTER_SCHEMA:-api}" \
+	--postgrest \
 	"$gtfs_path/"*.txt \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1'
