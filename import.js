@@ -126,7 +126,7 @@ const importGtfsAtomically = async (cfg) => {
 
 	// todo: DRY with lib.sh
 	const zipPath = `${tmpDir}/gtfs.zip`
-	logger.info(`downloading data to "${zipPath}"\n`)
+	logger.info(`downloading data to "${zipPath}"`)
 	const _t0Download = performance.now()
 	await pSpawn(pathToDownloadScript, [], {
 		stdio: 'inherit',
@@ -236,7 +236,7 @@ const importGtfsAtomically = async (cfg) => {
 		logger.debug(`creating database "${dbName}"`)
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
 
-		logger.info(`importing data into "${dbName}"\n`)
+		logger.info(`importing data into "${dbName}"`)
 		const _importEnv = {
 			...process.env,
 			PGDATABASE: dbName,
@@ -267,7 +267,7 @@ const importGtfsAtomically = async (cfg) => {
 		})
 		result.importDurationMs = performance.now() - _t0Import
 
-		logger.info(`\nmarking the import into "${dbName}" as the latest`)
+		logger.info(`marking the import into "${dbName}" as the latest`)
 		await client.query(`\
 			INSERT INTO latest_import (db_name, always_true)
 			VALUES ($1, True)
@@ -304,6 +304,7 @@ const importGtfsAtomically = async (cfg) => {
 		client.end()
 	}
 
+	logger.debug('done!')
 	return result
 }
 
