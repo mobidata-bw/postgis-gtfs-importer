@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url'
 import _pg from 'pg'
 const {Client} = _pg
 import pgFormat from 'pg-format'
-import {fail, ok} from 'node:assert'
+import {deepStrictEqual, fail, ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
@@ -48,6 +48,21 @@ const pSpawn = (path, args = [], opts = {}) => {
 	})
 }
 
+const parseDbName = (name, namePrefix) => {
+	if (name.slice(0, namePrefix.length) !== namePrefix) return null
+	const match = new RegExp(`^(\\d{10,})_([0-9a-f]{${DIGEST_LENGTH}})$`).exec(name.slice(namePrefix.length))
+	if (!match) return null
+	return {
+		name,
+		importedAt: parseInt(match[1]),
+		feedDigest: match[2],
+	}
+}
+deepStrictEqual(
+	parseDbName('gtfs_nyct_subway_1712169379_0f1deb', 'gtfs_nyct_subway_'),
+	{name: 'gtfs_nyct_subway_1712169379_0f1deb', importedAt: 1712169379, feedDigest: '0f1deb'},
+)
+
 const importGtfsAtomically = async (cfg) => {
 	const {
 		logger,
@@ -88,10 +103,10 @@ const importGtfsAtomically = async (cfg) => {
 
 	const result = {
 		downloadDurationMs: null,
-		deletedDatabases: [],
-		retainedDatabases: null,
+		deletedDatabases: [], // [{name, importedAt, feedDigest}]
+		retainedDatabases: null, // [{name, importedAt, feedDigest}]
 		importSkipped: false,
-		databaseName: null,
+		database: null, // or {name, importedAt, feedDigest}
 		importDurationMs: null,
 	}
 
@@ -154,14 +169,17 @@ const importGtfsAtomically = async (cfg) => {
 
 		logger.debug('checking previous imports')
 
-		let {
+		const {
 			rows: [{
-				db_name: prevImport,
+				db_name: _prevImportName,
 			}],
 		} = await client.query('SELECT db_name FROM latest_import')
-		if (prevImport !== null) {
-			logger.info(`latest import is in database "${prevImport}", keeping it until the new import has succeeded`)
+		if (_prevImportName !== null) {
+			logger.info(`latest import is in database "${_prevImportName}", keeping it until the new import has succeeded`)
 		}
+		let prevImport = _prevImportName
+			? parseDbName(_prevImportName, databaseNamePrefix)
+			: null
 
 		{
 			const res = await client.query(`\
@@ -170,45 +188,50 @@ const importGtfsAtomically = async (cfg) => {
 				ORDER BY datname ASC
 			`)
 			const oldDbs = res.rows
-			.map(r => r.db_name)
-			.filter(dbName => dbName.slice(0, databaseNamePrefix.length) === databaseNamePrefix)
-			.filter(dbName => new RegExp(`^\\d{10,}_[0-9a-f]{${DIGEST_LENGTH}}$`).test(dbName.slice(databaseNamePrefix.length)))
-			logger.debug('old DBs, including previous import: ' + oldDbs.join(', '))
-			if (prevImport && !oldDbs.includes(prevImport)) {
+			.map(r => parseDbName(r.db_name, databaseNamePrefix))
+			.filter(parsed => Boolean(parsed))
+			logger.debug('old DBs, including previous import: ' + oldDbs.map(db => db.name).join(', '))
+			if (prevImport && !oldDbs.some(({name}) => name === prevImport.name)) {
 				logger.warn(`The latest_import table points to a database "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
 				prevImport = null
 			}
 
 			const dbsToRetain = determineDbsToRetain(oldDbs)
 			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
-			if (prevImport && !dbsToRetain.includes(prevImport)) {
+			if (prevImport && !dbsToRetain.some(({name}) => name === prevImport.name)) {
 				fail(`determineDbsToRetain() must retain the previous import "${prevImport.name}"`)
 			}
 			result.retainedDatabases = dbsToRetain
 
-			for (const dbName of oldDbs) {
-				if (dbsToRetain.includes(dbName)) {
+			const _dbsToRetain = new Set(dbsToRetain.map(db => db.name))
+			for (const oldDb of oldDbs) {
+				if (_dbsToRetain.has(oldDb.name)) {
 					continue;
 				}
-				logger.info(`dropping database "${dbName}" containing an older or unfinished import`)
-				await dbMngmtClient.query(pgFormat('DROP DATABASE %I', dbName))
-				result.deletedDatabases.push(dbName)
+				logger.info(`dropping database "${oldDb.name}" containing an older or unfinished import`)
+				await dbMngmtClient.query(pgFormat('DROP DATABASE %I', oldDb.name))
+				result.deletedDatabases.push(oldDb)
 			}
 		}
 
 		const zipDigest = await digestFile(zipPath)
+		const importedAt = (Date.now() / 1000 | 0)
 		const dbName = [
 			databaseNamePrefix,
-			(Date.now() / 1000 | 0),
+			importedAt,
 			'_',
 			zipDigest,
 		].join('')
-		if (prevImport?.slice(-DIGEST_LENGTH) === zipDigest) {
+		if (prevImport?.feedDigest === zipDigest) {
 			result.importSkipped = true
 			logger.info('GTFS feed digest has not changed, skipping import')
 			return result
 		}
-		result.databaseName = dbName
+		result.database = {
+			name: dbName,
+			importedAt,
+			feedDigest: zipDigest,
+		}
 
 		logger.debug(`creating database "${dbName}"`)
 		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
