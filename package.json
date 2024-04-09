@@ -11,5 +11,11 @@
 		"pg": "^8.11.3",
 		"pg-format": "^1.0.4",
 		"signal-exit": "^4.1.0"
+	},
+	"devDependencies": {
+		"eslint": "^8.57.0"
+	},
+	"scripts": {
+		"lint": "eslint ."
 	}
 }

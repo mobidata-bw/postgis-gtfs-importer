@@ -12,6 +12,14 @@ jobs:
     - name: checkout
       uses: actions/checkout@v4
 
+    - name: setup Node v${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - run: npm install
+
+    - run: npm run lint
+
     - name: set up Docker buildx
       uses: docker/setup-buildx-action@v3
 
