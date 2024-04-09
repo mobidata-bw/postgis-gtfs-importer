@@ -52,11 +52,6 @@ RUN \
 	&& chmod +x /usr/local/bin/gtfstidy
 
 # todo: gtfs-via-postgres is Prosperity-dual-licensed, obtain a purely Apache-licensed version
-# todo: Docker layer caching won't pull the latest 4.x release
-RUN \
-	npm install -g gtfs-via-postgres@'^4.9.0' \
-	&& npm cache clean --force
-
 ADD package.json ./
 RUN npm install --omit dev && npm cache clean --force
 

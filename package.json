@@ -8,6 +8,7 @@
 		"node": ">=20"
 	},
 	"dependencies": {
+		"gtfs-via-postgres": "^4.10.0",
 		"pg": "^8.11.3",
 		"pg-format": "^1.0.4",
 		"signal-exit": "^4.1.0"

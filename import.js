@@ -9,6 +9,15 @@ import pgFormat from 'pg-format'
 import {deepStrictEqual, fail, ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
 
+// expose npm-installed local CLI tools to child processes
+import {createRequire} from 'node:module'
+import {dirname} from 'node:path'
+// todo: use import.meta.resolve once it is stable?
+// see https://nodejs.org/docs/latest-v20.x/api/esm.html#importmetaresolvespecifier
+const require = createRequire(import.meta.url)
+const GTFS_VIA_POSTGRES_PKG = require.resolve('gtfs-via-postgres/package.json')
+const NPM_BIN_DIR = dirname(dirname(GTFS_VIA_POSTGRES_PKG)) + '/.bin'
+
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
 const PATH_TO_DOWNLOAD_SCRIPT = fileURLToPath(new URL('download.sh', import.meta.url).href)
 
@@ -239,6 +248,7 @@ const importGtfsAtomically = async (cfg) => {
 		logger.info(`importing data into "${dbName}"`)
 		const _importEnv = {
 			...process.env,
+			PATH: NPM_BIN_DIR + ':' + process.env.PATH,
 			PGDATABASE: dbName,
 			GTFS_TMP_DIR: tmpDir,
 		}
