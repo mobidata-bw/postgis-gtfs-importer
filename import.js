@@ -75,6 +75,10 @@ deepStrictEqual(
 const importGtfsAtomically = async (cfg) => {
 	const {
 		logger,
+		downloadScriptVerbose,
+		connectDownloadScriptToStdout,
+		importScriptVerbose,
+		connectImportScriptToStdout,
 		pgHost, pgUser, pgPassword, pgMetaDatabase,
 		databaseNamePrefix,
 		schemaName,
@@ -89,6 +93,10 @@ const importGtfsAtomically = async (cfg) => {
 		gtfsSqlDPath,
 	} = {
 		logger: console,
+		downloadScriptVerbose: true,
+		connectDownloadScriptToStdout: true,
+		importScriptVerbose: true,
+		connectImportScriptToStdout: true,
 		pgHost: null,
 		pgUser: null,
 		pgPassword: null,
@@ -138,12 +146,17 @@ const importGtfsAtomically = async (cfg) => {
 	logger.info(`downloading data to "${zipPath}"`)
 	const _t0Download = performance.now()
 	await pSpawn(pathToDownloadScript, [], {
-		stdio: 'inherit',
+		stdio: [
+			'inherit',
+			connectDownloadScriptToStdout ? 'inherit' : 'ignore',
+			'inherit',
+		],
 		env: {
 			...process.env,
 			GTFS_TMP_DIR: tmpDir,
 			GTFS_DOWNLOAD_URL: gtfsDownloadUrl,
 			GTFS_DOWNLOAD_USER_AGENT: gtfsDownloadUserAgent,
+			GTFS_DOWNLOAD_VERBOSE: downloadScriptVerbose ? 'true' : 'false',
 		},
 	})
 	result.downloadDurationMs = performance.now() - _t0Download
@@ -251,6 +264,7 @@ const importGtfsAtomically = async (cfg) => {
 			PATH: NPM_BIN_DIR + ':' + process.env.PATH,
 			PGDATABASE: dbName,
 			GTFS_TMP_DIR: tmpDir,
+			GTFS_IMPORTER_VERBOSE: importScriptVerbose ? 'true' : 'false',
 		}
 		if (pgHost !== null) {
 			_importEnv.PGHOST = pgHost
@@ -272,7 +286,11 @@ const importGtfsAtomically = async (cfg) => {
 		}
 		const _t0Import = performance.now()
 		await pSpawn(pathToImportScript, [], {
-			stdio: 'inherit',
+			stdio: [
+				'inherit',
+				connectImportScriptToStdout ? 'inherit' : 'ignore',
+				'inherit',
+			],
 			env: _importEnv,
 		})
 		result.importDurationMs = performance.now() - _t0Import
