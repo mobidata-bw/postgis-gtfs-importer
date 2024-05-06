@@ -9,8 +9,12 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 ua="${GTFS_DOWNLOAD_USER_AGENT:?'missing/empty $GTFS_DOWNLOAD_USER_AGENT'}"
 gtfs_url="${GTFS_DOWNLOAD_URL:?'missing/empty $GTFS_DOWNLOAD_URL'}"
 
+verbose="${GTFS_DOWNLOAD_VERBOSE:-true}"
+if [ "$verbose" != false ]; then
+	set -x # enable xtrace
+fi
+
 print_bold "Downloading the GTFS feed from $GTFS_DOWNLOAD_URL."
-set -x
 
 mkdir -p "$gtfs_tmp_dir"
 
