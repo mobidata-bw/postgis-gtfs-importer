@@ -7,8 +7,6 @@ LABEL org.opencontainers.image.title="postgis-gtfs-importer"
 LABEL org.opencontainers.image.description="Imports GTFS data into a PostGIS database, using gtfstidy & gtfs-via-postgres."
 LABEL org.opencontainers.image.authors="MobiData-BW IPL contributors <mobidata-bw@nvbw.de>"
 LABEL org.opencontainers.image.documentation="https://github.com/mobidata-bw/postgis-gtfs-importer"
-LABEL org.opencontainers.image.source="https://github.com/mobidata-bw/postgis-gtfs-importer"
-LABEL org.opencontainers.image.licenses="(EUPL-1.2)"
 
 WORKDIR /importer
 
