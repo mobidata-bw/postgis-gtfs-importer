@@ -45,7 +45,7 @@ jobs:
           org.opencontainers.image.version=${{ steps.docker-tags.outputs.oci-version }}
 
     - name: build and push Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         push: true
         tags: |
