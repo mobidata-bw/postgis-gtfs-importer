@@ -77,8 +77,13 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 if [ -d "$postprocessing_d_path" ]; then
 	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
 	for file in "$postprocessing_d_path/"*; do
-		psql -b -1 -v 'ON_ERROR_STOP=1' "${psql_args[@]}" \
-			-f "$file"
+		ext="${file##*.}"
+		if [ "$ext" = "sql" ]; then
+			psql -b -1 -v 'ON_ERROR_STOP=1' "${psql_args[@]}" \
+				-f "$file"
+		else
+			"$file" "$gtfs_path"
+		fi
 	done
 fi
 
