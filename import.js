@@ -90,7 +90,7 @@ const importGtfsAtomically = async (cfg) => {
 		tmpDir,
 		gtfstidyBeforeImport,
 		determineDbsToRetain,
-		gtfsSqlDPath,
+		gtfsPostprocessingDPath,
 	} = {
 		logger: console,
 		downloadScriptVerbose: true,
@@ -110,7 +110,7 @@ const importGtfsAtomically = async (cfg) => {
 		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
 		determineDbsToRetain: oldDbs => oldDbs, // all
-		gtfsSqlDPath: null,
+		gtfsPostprocessingDPath: null,
 		...cfg,
 	}
 	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
@@ -281,8 +281,8 @@ const importGtfsAtomically = async (cfg) => {
 		if (gtfstidyBeforeImport !== null) {
 			_importEnv.GTFSTIDY_BEFORE_IMPORT = String(gtfstidyBeforeImport)
 		}
-		if (gtfsSqlDPath !== null) {
-			_importEnv.GTFS_SQL_D_PATH = gtfsSqlDPath
+		if (gtfsPostprocessingDPath !== null) {
+			_importEnv.GTFS_POSTPROCESSING_D_PATH = gtfsPostprocessingDPath
 		}
 		const _t0Import = performance.now()
 		await pSpawn(pathToImportScript, [], {
