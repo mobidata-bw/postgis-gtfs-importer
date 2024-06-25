@@ -18,7 +18,7 @@ Before each import, it also **deletes all imports but the most recent two**; Thi
 
 Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/14/explicit-locking.html) on on `latest_import` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up as part of the next import (see above).
 
-After the GTFS has been imported but before the import is marked as successful, it will run all SQL post-processing scripts in `/etc/gtfs/sql.d` (this path can be changed using `$GTFS_SQL_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction as the GTFS import.
+After the GTFS has been imported but before the import is marked as successful, it will run all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction (in the bookkeeping DB) as the GTFS import.
 
 
 ## Usage

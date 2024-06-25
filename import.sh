@@ -8,7 +8,7 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 
 gtfs_path=''
 
-sql_d_path="${GTFS_SQL_D_PATH:-/etc/gtfs/sql.d}"
+postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:-/etc/gtfs/postprocessing.d}"
 
 verbose="${GTFS_IMPORTER_VERBOSE:-true}"
 if [ "$verbose" != false ]; then
@@ -74,9 +74,9 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1' "${psql_args[@]}"
 
-if [ -d "$sql_d_path" ]; then
-	print_bold "Running custom post-processing SQL scripts in $sql_d_path."
-	for file in "$sql_d_path/"*; do
+if [ -d "$postprocessing_d_path" ]; then
+	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
+	for file in "$postprocessing_d_path/"*; do
 		psql -b -1 -v 'ON_ERROR_STOP=1' "${psql_args[@]}" \
 			-f "$file"
 	done
