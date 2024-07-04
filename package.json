@@ -4,6 +4,9 @@
 	"version": "3",
 	"type": "module",
 	"main": "importer.js",
+	"bin": {
+		"postgis-gtfs-importer": "./importer.js"
+	},
 	"engines": {
 		"node": ">=20"
 	},
