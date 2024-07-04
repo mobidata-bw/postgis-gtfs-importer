@@ -1,6 +1,6 @@
 # PostGIS GTFS importer
 
-This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. It allows running a production service (e.g. API) on top of programmatically re-imported data from a periodically changing GTFS feed without downtime.
+This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. It allows running a production service (e.g. an API) on top of programmatically re-imported data from a periodically changing GTFS feed without downtime.
 
 Because it works as [atomically](https://en.wikipedia.org/wiki/Atomicity_(database_systems)) as possible with PostgreSQL, it makes the import pipeline *robust*, even if an import fails or if simultaneous imports get started.
 
@@ -31,7 +31,7 @@ docker run --rm -it \
 	-v $PWD/gtfs-tmp:/tmp/gtfs \
 	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
 	-e 'GTFS_DOWNLOAD_URL=…' \
-	ghcr.io/mobidata-bw/postgis-gtfs-importer:v3
+	ghcr.io/mobidata-bw/postgis-gtfs-importer:v4
 ```
 
 *Note:* We mount a `gtfs-tmp` directory to prevent it from re-downloading the GTFS dataset every time, even when it hasn't changed.

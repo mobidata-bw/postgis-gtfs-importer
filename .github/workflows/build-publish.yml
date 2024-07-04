@@ -49,7 +49,7 @@ jobs:
       with:
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:v3
+          ghcr.io/${{ github.repository }}:v4
           ghcr.io/${{ github.repository }}:${{ steps.docker-tags.outputs.permanent-tag }}
         labels: ${{ steps.docker-metadata.outputs.labels }}
         platforms: linux/amd64
