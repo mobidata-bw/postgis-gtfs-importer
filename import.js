@@ -1,13 +1,14 @@
-import {createHash} from 'node:crypto'
-import {createReadStream} from 'node:fs'
-import {spawn} from 'node:child_process'
-import {onExit} from 'signal-exit'
 import {fileURLToPath} from 'node:url'
-import _pg from 'pg'
-const {Client} = _pg
 import pgFormat from 'pg-format'
-import {deepStrictEqual, fail, ok} from 'node:assert'
+import {fail, ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
+import {
+	digestFile,
+	pSpawn,
+	formatDbName,
+	connectToMetaDatabase,
+	readImportedDatabases,
+} from './index.js'
 
 // expose npm-installed local CLI tools to child processes
 import {createRequire} from 'node:module'
@@ -20,57 +21,6 @@ const NPM_BIN_DIR = dirname(dirname(GTFS_VIA_POSTGRES_PKG)) + '/.bin'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
 const PATH_TO_DOWNLOAD_SCRIPT = fileURLToPath(new URL('download.sh', import.meta.url).href)
-
-const DIGEST_LENGTH = 6
-const digestFile = async (pathToFile) => {
-	const hash = createHash('sha256')
-	for await (const chunk of createReadStream(pathToFile)) {
-		hash.update(chunk)
-	}
-	return hash.digest('hex').slice(0, DIGEST_LENGTH).toLowerCase()
-}
-
-const pSpawn = (path, args = [], opts = {}) => {
-	return new Promise((resolve, reject) => {
-		const proc = spawn(path, args, opts)
-		// https://github.com/sindresorhus/execa/blob/f4b8b3ab601c94d1503f1010822952758dcc6350/lib/kill.js#L95-L101
-		const stopListening = onExit(() => {
-			proc.kill()
-		})
-		proc.once('error', (err) => {
-			reject(err)
-			stopListening()
-			proc.kill()
-		})
-		proc.once('exit', (code, signal) => {
-			if (code === 0) {
-				resolve()
-			} else {
-				const err = new Error(`${path} exited with ${code} (${signal})`)
-				err.code = code
-				err.signal = signal
-				err.proc = proc
-				reject(err)
-			}
-			stopListening()
-		})
-	})
-}
-
-const parseDbName = (name, namePrefix) => {
-	if (name.slice(0, namePrefix.length) !== namePrefix) return null
-	const match = new RegExp(`^(\\d{10,})_([0-9a-f]{${DIGEST_LENGTH}})$`).exec(name.slice(namePrefix.length))
-	if (!match) return null
-	return {
-		name,
-		importedAt: parseInt(match[1]),
-		feedDigest: match[2],
-	}
-}
-deepStrictEqual(
-	parseDbName('gtfs_nyct_subway_1712169379_0f1deb', 'gtfs_nyct_subway_'),
-	{name: 'gtfs_nyct_subway_1712169379_0f1deb', importedAt: 1712169379, feedDigest: '0f1deb'},
-)
 
 const importGtfsAtomically = async (cfg) => {
 	const {
@@ -127,20 +77,6 @@ const importGtfsAtomically = async (cfg) => {
 		importDurationMs: null,
 	}
 
-	const pgConfig = {}
-	if (pgHost !== null) {
-		pgConfig.host = pgHost
-	}
-	if (pgUser !== null) {
-		pgConfig.user = pgUser
-	}
-	if (pgPassword !== null) {
-		pgConfig.password = pgPassword
-	}
-	if (pgMetaDatabase !== null) {
-		pgConfig.database = pgMetaDatabase
-	}
-
 	// todo: DRY with lib.sh
 	const zipPath = `${tmpDir}/gtfs.zip`
 	logger.info(`downloading data to "${zipPath}"`)
@@ -164,11 +100,13 @@ const importGtfsAtomically = async (cfg) => {
 	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
 	// have to drop it manually when cleaning up failed/aborted imports.
-	const dbMngmtClient = new Client(pgConfig)
-	await dbMngmtClient.connect()
+	const dbMngmtClient = await connectToMetaDatabase({
+		pgHost, pgUser, pgPassword, pgMetaDatabase,
+	})
 
-	const client = new Client(pgConfig)
-	await client.connect()
+	const client = await connectToMetaDatabase({
+		pgHost, pgUser, pgPassword, pgMetaDatabase,
+	})
 
 	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
 	await client.query(`\
@@ -191,32 +129,23 @@ const importGtfsAtomically = async (cfg) => {
 
 		logger.debug('checking previous imports')
 
-		const {
-			rows: [{
-				db_name: _prevImportName,
-			}],
-		} = await client.query('SELECT db_name FROM latest_import')
-		if (_prevImportName !== null) {
-			logger.info(`latest import is in database "${_prevImportName}", keeping it until the new import has succeeded`)
+		let {
+			prevImport,
+			oldDbs,
+		} = await readImportedDatabases({
+			databaseNamePrefix,
+			db: client,
+		})
+		if (prevImport !== null) {
+			logger.info(`latest import is in database "${prevImport.name}", keeping it until the new import has succeeded`)
 		}
-		let prevImport = _prevImportName
-			? parseDbName(_prevImportName, databaseNamePrefix)
-			: null
+		logger.debug('old DBs, including previous import: ' + oldDbs.map(db => db.name).join(', '))
+		if (prevImport && !oldDbs.some(({name}) => name === prevImport.name)) {
+			logger.warn(`The latest_import table points to a database "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
+			prevImport = null
+		}
 
 		{
-			const res = await client.query(`\
-				SELECT datname AS db_name
-				FROM pg_catalog.pg_database
-				ORDER BY datname ASC
-			`)
-			const oldDbs = res.rows
-			.map(r => parseDbName(r.db_name, databaseNamePrefix))
-			.filter(parsed => Boolean(parsed))
-			logger.debug('old DBs, including previous import: ' + oldDbs.map(db => db.name).join(', '))
-			if (prevImport && !oldDbs.some(({name}) => name === prevImport.name)) {
-				logger.warn(`The latest_import table points to a database "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
-				prevImport = null
-			}
 
 			const dbsToRetain = determineDbsToRetain(oldDbs)
 			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
@@ -238,12 +167,11 @@ const importGtfsAtomically = async (cfg) => {
 
 		const zipDigest = await digestFile(zipPath)
 		const importedAt = (Date.now() / 1000 | 0)
-		const dbName = [
+		const dbName = formatDbName({
 			databaseNamePrefix,
 			importedAt,
-			'_',
 			zipDigest,
-		].join('')
+		})
 		if (prevImport?.feedDigest === zipDigest) {
 			result.importSkipped = true
 			logger.info('GTFS feed digest has not changed, skipping import')
