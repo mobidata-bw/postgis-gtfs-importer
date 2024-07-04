@@ -68,7 +68,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 	--trips-without-shape-id --lower-case-lang-codes \
 	--stops-location-index \
 	--import-metadata \
-	--schema "${GTFS_IMPORTER_SCHEMA:-api}" \
+	--schema "${GTFS_IMPORTER_SCHEMA:-public}" \
 	--postgrest \
 	"$gtfs_path/"*.txt \
 	| zstd | sponge | zstd -d \
