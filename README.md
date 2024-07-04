@@ -38,7 +38,7 @@ docker run --rm -it \
 
 You can configure access to the PostgreSQL by passing the [standard `PG*` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html) into the container.
 
-If you run `GTFSTIDY_BEFORE_IMPORT=false`, gtfstidy will not be used.
+If you run with `GTFSTIDY_BEFORE_IMPORT=false`, gtfstidy will not be used.
 
 ### writing a DSN file
 

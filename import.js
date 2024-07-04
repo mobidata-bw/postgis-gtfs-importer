@@ -294,6 +294,7 @@ const importGtfsAtomically = async (cfg) => {
 			env: _importEnv,
 		})
 		result.importDurationMs = performance.now() - _t0Import
+		logger.debug(`import succeeded in ${Math.round(result.importDurationMs / 1000)}s`)
 
 		logger.info(`marking the import into "${dbName}" as the latest`)
 		await client.query(`\
