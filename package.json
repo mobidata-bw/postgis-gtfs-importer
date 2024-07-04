@@ -3,7 +3,7 @@
 	"name": "postgis-gtfs-importer",
 	"version": "3",
 	"type": "module",
-	"main": "importer.js",
+	"main": "index.js",
 	"bin": {
 		"postgis-gtfs-importer": "./importer.js"
 	},
