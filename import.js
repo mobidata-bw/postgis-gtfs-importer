@@ -107,7 +107,7 @@ const importGtfsAtomically = async (cfg) => {
 		pathToDsnFile: process.env.GTFS_IMPORTER_DSN_FILE || null,
 		gtfsDownloadUrl: null,
 		gtfsDownloadUserAgent: null,
-		tmpDir: '/tmp/gtfs',
+		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
 		determineDbsToRetain: oldDbs => oldDbs, // all
 		gtfsSqlDPath: null,
