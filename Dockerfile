@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.9
 # ^ needed for ADD --checksum=…
 
 FROM node:20-bookworm-slim
