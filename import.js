@@ -29,7 +29,7 @@ const importGtfsAtomically = async (cfg) => {
 		connectDownloadScriptToStdout,
 		importScriptVerbose,
 		connectImportScriptToStdout,
-		pgHost, pgUser, pgPassword, pgMetaDatabase,
+		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 		databaseNamePrefix,
 		schemaName,
 		pathToImportScript,
@@ -51,6 +51,7 @@ const importGtfsAtomically = async (cfg) => {
 		pgUser: null,
 		pgPassword: null,
 		pgMetaDatabase: process.env.PGDATABASE || null,
+		pgOpts: {},
 		schemaName: process.env.GTFS_IMPORTER_SCHEMA || null,
 		pathToImportScript: PATH_TO_IMPORT_SCRIPT,
 		pathToDownloadScript: PATH_TO_DOWNLOAD_SCRIPT,
@@ -101,11 +102,11 @@ const importGtfsAtomically = async (cfg) => {
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
 	// have to drop it manually when cleaning up failed/aborted imports.
 	const dbMngmtClient = await connectToMetaDatabase({
-		pgHost, pgUser, pgPassword, pgMetaDatabase,
+		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 	})
 
 	const client = await connectToMetaDatabase({
-		pgHost, pgUser, pgPassword, pgMetaDatabase,
+		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 	})
 
 	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
