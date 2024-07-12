@@ -72,15 +72,19 @@ const connectToMetaDatabase = async (cfg) => {
 		pgUser,
 		pgPassword,
 		pgMetaDatabase,
+		pgOpts,
 	} = {
 		pgHost: null,
 		pgUser: null,
 		pgPassword: null,
 		pgMetaDatabase: process.env.PGDATABASE || null,
+		pgOpts: {},
 		...cfg,
 	}
 
-	const pgConfig = {}
+	const pgConfig = {
+		...pgOpts,
+	}
 	if (pgHost !== null) {
 		pgConfig.host = pgHost
 	}
