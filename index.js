@@ -66,7 +66,7 @@ deepStrictEqual(
 	{name: 'gtfs_nyct_subway_1712169379_0f1deb', importedAt: 1712169379, feedDigest: '0f1deb'},
 )
 
-const connectToMetaDatabase = async (cfg) => {
+const getPgConfig = async (cfg) => {
 	const {
 		pgHost,
 		pgPort,
@@ -113,10 +113,40 @@ const connectToMetaDatabase = async (cfg) => {
 		pgConfig.database = process.env.PGDATABASE
 	}
 
+	return pgConfig
+}
+
+const connectToMetaDatabase = async (cfg) => {
+	const pgConfig = await getPgConfig(cfg)
 	const db = new Client(pgConfig)
 	await db.connect()
 
 	return db
+}
+
+// https://www.postgresql.org/docs/15/libpq-connect.html#id-1.7.3.8.3.5
+const getPgEnv = async (pgConfig) => {
+	const pgEnv = {
+	}
+
+	if (pgConfig.host !== null) {
+		pgEnv.PGHOST = pgConfig.host
+	}
+	if (pgConfig.port !== null) {
+		pgEnv.PGPORT = pgConfig.port
+	}
+	if (pgConfig.user !== null) {
+		pgEnv.PGUSER = pgConfig.user
+	}
+	if (pgConfig.password !== null) {
+		pgEnv.PGPASSWORD = pgConfig.password
+	}
+	if (pgConfig.database !== null) {
+		pgEnv.PGDATABASE = pgConfig.database
+	}
+	// todo: ssl mode?
+
+	return pgConfig
 }
 
 const readImportedDatabases = async (cfg) => {
@@ -175,6 +205,8 @@ export {
 	pSpawn,
 	formatDbName,
 	parseDbName,
+	getPgEnv,
+	getPgConfig,
 	connectToMetaDatabase,
 	readImportedDatabases,
 }
