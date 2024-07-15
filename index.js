@@ -69,12 +69,14 @@ deepStrictEqual(
 const connectToMetaDatabase = async (cfg) => {
 	const {
 		pgHost,
+		pgPort,
 		pgUser,
 		pgPassword,
 		pgMetaDatabase,
 		pgOpts,
 	} = {
 		pgHost: null,
+		pgPort: null,
 		pgUser: null,
 		pgPassword: null,
 		pgMetaDatabase: null,
@@ -89,6 +91,11 @@ const connectToMetaDatabase = async (cfg) => {
 		pgConfig.host = pgHost
 	} else if (process.env.PGHOST) {
 		pgConfig.host = process.env.PGHOST
+	}
+	if (pgPort !== null) {
+		pgConfig.port = pgPort
+	} else if (process.env.PGPORT) {
+		pgConfig.port = process.env.PGPORT
 	}
 	if (pgUser !== null) {
 		pgConfig.user = pgUser

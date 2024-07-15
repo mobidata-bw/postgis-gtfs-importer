@@ -29,7 +29,7 @@ const importGtfsAtomically = async (cfg) => {
 		connectDownloadScriptToStdout,
 		importScriptVerbose,
 		connectImportScriptToStdout,
-		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
+		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 		databaseNamePrefix,
 		schemaName,
 		pathToImportScript,
@@ -48,6 +48,7 @@ const importGtfsAtomically = async (cfg) => {
 		importScriptVerbose: true,
 		connectImportScriptToStdout: true,
 		pgHost: null,
+		pgPort: null,
 		pgUser: null,
 		pgPassword: null,
 		pgMetaDatabase: process.env.PGDATABASE || null,
@@ -102,11 +103,11 @@ const importGtfsAtomically = async (cfg) => {
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
 	// have to drop it manually when cleaning up failed/aborted imports.
 	const dbMngmtClient = await connectToMetaDatabase({
-		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
+		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 	})
 
 	const client = await connectToMetaDatabase({
-		pgHost, pgUser, pgPassword, pgMetaDatabase, pgOpts,
+		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 	})
 
 	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
@@ -198,6 +199,9 @@ const importGtfsAtomically = async (cfg) => {
 		if (pgHost !== null) {
 			_importEnv.PGHOST = pgHost
 		}
+		if (pgPort !== null) {
+			_importEnv.PGPORT = pgPort
+		}
 		if (pgUser !== null) {
 			_importEnv.PGUSER = pgUser
 		}
@@ -237,15 +241,18 @@ const importGtfsAtomically = async (cfg) => {
 			// https://www.postgresql.org/docs/15/libpq-connect.html#id-1.7.3.8.3.5
 			const {
 				PGHOST,
+				PGPORT,
 				POSTGREST_USER,
 				POSTGREST_PASSWORD,
 			} = process.env
 			ok(PGHOST, 'missing/empty $PGHOST')
+			ok(PGPORT, 'missing/empty $PGPORT')
+			// todo: why `POSTGREST_`? rename to e.g. `PGBOUNCER_`?
 			ok(POSTGREST_USER, 'missing/empty $POSTGREST_USER')
 			ok(POSTGREST_PASSWORD, 'missing/empty $POSTGREST_PASSWORD')
 
-			const dsn = `gtfs=host=${PGHOST} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD}`
-			const logDsn = `gtfs=host=${PGHOST} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD.slice(0, 2)}…${POSTGREST_PASSWORD.slice(-2)}`
+			const dsn = `gtfs=host=${PGHOST} port=${PGPORT} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD}`
+			const logDsn = `gtfs=host=${PGHOST} port=${PGPORT} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD.slice(0, 2)}…${POSTGREST_PASSWORD.slice(-2)}`
 			logger.debug(`writing "${logDsn}" into env file ${pathToDsnFile}`)
 			await writeFile(pathToDsnFile, dsn)
 		}
