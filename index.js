@@ -77,7 +77,7 @@ const connectToMetaDatabase = async (cfg) => {
 		pgHost: null,
 		pgUser: null,
 		pgPassword: null,
-		pgMetaDatabase: process.env.PGDATABASE || null,
+		pgMetaDatabase: null,
 		pgOpts: {},
 		...cfg,
 	}
@@ -87,15 +87,23 @@ const connectToMetaDatabase = async (cfg) => {
 	}
 	if (pgHost !== null) {
 		pgConfig.host = pgHost
+	} else if (process.env.PGHOST) {
+		pgConfig.host = process.env.PGHOST
 	}
 	if (pgUser !== null) {
 		pgConfig.user = pgUser
+	} else if (process.env.PGUSER) {
+		pgConfig.user = process.env.PGUSER
 	}
 	if (pgPassword !== null) {
 		pgConfig.password = pgPassword
+	} else if (process.env.PGPASSWORD) {
+		pgConfig.password = process.env.PGPASSWORD
 	}
 	if (pgMetaDatabase !== null) {
 		pgConfig.database = pgMetaDatabase
+	} else if (process.env.PGDATABASE) {
+		pgConfig.database = process.env.PGDATABASE
 	}
 
 	const db = new Client(pgConfig)
