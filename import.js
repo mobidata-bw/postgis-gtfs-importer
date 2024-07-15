@@ -6,6 +6,8 @@ import {
 	digestFile,
 	pSpawn,
 	formatDbName,
+	getPgConfig,
+	getPgEnv,
 	connectToMetaDatabase,
 	readImportedDatabases,
 } from './index.js'
@@ -29,7 +31,6 @@ const importGtfsAtomically = async (cfg) => {
 		connectDownloadScriptToStdout,
 		importScriptVerbose,
 		connectImportScriptToStdout,
-		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
 		databaseNamePrefix,
 		schemaName,
 		pathToImportScript,
@@ -47,12 +48,6 @@ const importGtfsAtomically = async (cfg) => {
 		connectDownloadScriptToStdout: true,
 		importScriptVerbose: true,
 		connectImportScriptToStdout: true,
-		pgHost: null,
-		pgPort: null,
-		pgUser: null,
-		pgPassword: null,
-		pgMetaDatabase: process.env.PGDATABASE || null,
-		pgOpts: {},
 		schemaName: process.env.GTFS_IMPORTER_SCHEMA || null,
 		pathToImportScript: PATH_TO_IMPORT_SCRIPT,
 		pathToDownloadScript: PATH_TO_DOWNLOAD_SCRIPT,
@@ -99,16 +94,15 @@ const importGtfsAtomically = async (cfg) => {
 	})
 	result.downloadDurationMs = performance.now() - _t0Download
 
+	const pgConfig = await getPgConfig(cfg)
+	const pgEnv = getPgEnv(pgConfig)
+
 	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
 	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
 	// have to drop it manually when cleaning up failed/aborted imports.
-	const dbMngmtClient = await connectToMetaDatabase({
-		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
-	})
+	const dbMngmtClient = await connectToMetaDatabase(cfg)
 
-	const client = await connectToMetaDatabase({
-		pgHost, pgPort, pgUser, pgPassword, pgMetaDatabase, pgOpts,
-	})
+	const client = await connectToMetaDatabase(cfg)
 
 	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
 	await client.query(`\
@@ -191,22 +185,11 @@ const importGtfsAtomically = async (cfg) => {
 		logger.info(`importing data into "${dbName}"`)
 		const _importEnv = {
 			...process.env,
+			pgEnv,
 			PATH: NPM_BIN_DIR + ':' + process.env.PATH,
 			PGDATABASE: dbName,
 			GTFS_TMP_DIR: tmpDir,
 			GTFS_IMPORTER_VERBOSE: importScriptVerbose ? 'true' : 'false',
-		}
-		if (pgHost !== null) {
-			_importEnv.PGHOST = pgHost
-		}
-		if (pgPort !== null) {
-			_importEnv.PGPORT = pgPort
-		}
-		if (pgUser !== null) {
-			_importEnv.PGUSER = pgUser
-		}
-		if (pgPassword !== null) {
-			_importEnv.PGPASSWORD = pgPassword
 		}
 		if (schemaName !== null) {
 			_importEnv.GTFS_IMPORTER_SCHEMA = schemaName
