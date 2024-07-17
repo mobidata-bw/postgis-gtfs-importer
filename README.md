@@ -23,6 +23,20 @@ After the GTFS has been imported but before the import is marked as successful, 
 
 ## Usage
 
+### Prerequisites
+
+You can configure access to the bookkeeping DB using the [standard `$PG…` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html).
+
+```
+export PGDATABASE='…'
+export PGUSER='…'
+# …
+```
+
+*Note:* `postgis-gtfs-importer` requires a database user/role that is [allowed](https://www.postgresql.org/docs/14/sql-alterrole.html) to create new databases (`CREATEDB` privilege).
+
+### Importing Data
+
 The following commands demonstrate how to use the importer using Docker.
 
 ```shell
