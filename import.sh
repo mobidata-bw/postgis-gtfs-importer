@@ -36,14 +36,20 @@ fi
 
 if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	print_bold "Tidying GTFS feed using gtfstidy."
-
 	# Remove any leftovers from previous runs (e.g. pathways.txt/levels.txt)
 	rm -rf "$tidied_path"
+
+	set +x
+	gtfstidy_args=()
+	if [ "$verbose" != false ]; then
+		gtfstidy_args+=('--show-warnings')
+	fi
+	set -x
+
 	# Instead of --Compress, which is shorthand for -OSRCcIAPdT, we use --OSRCcIAPT (no id minimisation)
 	# Note: in later versions of gtfstidy, --keep-ids and --keep-additional-fields are introduced
-	# todo: if `$verbose != false`, somehow make gtfstidy less verbose
 	gtfstidy \
-		--show-warnings \
+		"${gtfstidy_args[@]}" \
 		-OSRCcIAPT \
 		--fix \
 		--min-shapes \
