@@ -44,15 +44,59 @@ if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	if [ "$verbose" != false ]; then
 		gtfstidy_args+=('--show-warnings')
 	fi
+
+	# fixing
+	if [ "${GTFSTIDY_FIX_ZIP:-true}" != false ]; then
+		gtfstidy_args+=('--fix-zip') # -z
+	fi
+	if [ "${GTFSTIDY_DEFAULT_ON_ERRS:-true}" != false ]; then
+		gtfstidy_args+=('--default-on-errs') # -e
+	fi
+	if [ "${GTFSTIDY_DROP_ERRS:-true}" != false ]; then
+		gtfstidy_args+=('--drop-errs') # -D
+	fi
+	if [ "${GTFSTIDY_CHECK_NULL_COORDS:-true}" != false ]; then
+		gtfstidy_args+=('--check-null-coords') # -n
+	fi
+
+	# minimization
+	# Note: In later versions of gtfstidy, --keep-ids and --keep-additional-fields will be introduced.
+	if [ "${GTFSTIDY_MIN_SHAPES:-true}" != false ]; then
+		gtfstidy_args+=('--min-shapes') # -s
+	fi
+	if [ "${GTFSTIDY_MINIMIZE_SERVICES:-true}" != false ]; then
+		gtfstidy_args+=('--minimize-services') # -c
+	fi
+	if [ "${GTFSTIDY_MINIMIZE_STOPTIMES:-true}" != false ]; then
+		gtfstidy_args+=('--minimize-stoptimes') # -T
+	fi
+	if [ "${GTFSTIDY_DELETE_ORPHANS:-true}" != false ]; then
+		gtfstidy_args+=('--delete-orphans') # -O
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_AGENCIES:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-agencies') # -A
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_ROUTES:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-routes') # -R
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SERVICES:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-services') # -C
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SHAPES:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-shapes') # -S
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_STOPS:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-stops') # -P
+	fi
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_TRIPS:-true}" != false ]; then
+		gtfstidy_args+=('--remove-red-trips') # -I
+	fi
+
+	# todo: allow configuring additional flags
 	set -x
 
-	# Instead of --Compress, which is shorthand for -OSRCcIAPdT, we use --OSRCcIAPT (no id minimisation)
-	# Note: in later versions of gtfstidy, --keep-ids and --keep-additional-fields are introduced
 	gtfstidy \
 		"${gtfstidy_args[@]}" \
-		-OSRCcIAPT \
-		--fix \
-		--min-shapes \
 		-o "$tidied_path" \
 		"$gtfs_path" \
 		2>&1 | tee "$gtfs_tmp_dir/tidied.gtfs.gtfstidy-log.txt"
