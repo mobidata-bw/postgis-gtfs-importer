@@ -126,6 +126,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 
 if [ -d "$postprocessing_d_path" ]; then
 	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
+	shopt -s nullglob
 	for file in "$postprocessing_d_path/"*; do
 		ext="${file##*.}"
 		if [ "$ext" = "sql" ]; then
@@ -135,6 +136,7 @@ if [ -d "$postprocessing_d_path" ]; then
 			"$file" "$gtfs_path"
 		fi
 	done
+	shopt -u nullglob
 fi
 
 print_bold 'Done!'
