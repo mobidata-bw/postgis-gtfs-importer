@@ -130,7 +130,7 @@ if [ -d "$postprocessing_d_path" ]; then
 	for file in "$postprocessing_d_path/"*; do
 		ext="${file##*.}"
 		if [ "$ext" = "sql" ]; then
-			psql -b -1 -v 'ON_ERROR_STOP=1' "${psql_args[@]}" \
+			psql -b -1 -v 'ON_ERROR_STOP=1' --set=SHELL="$SHELL" "${psql_args[@]}" \
 				-f "$file"
 		else
 			"$file" "$gtfs_path"

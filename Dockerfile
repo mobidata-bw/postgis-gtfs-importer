@@ -55,5 +55,9 @@ RUN npm install --omit dev && npm cache clean --force
 
 ADD . .
 
+# When evaluating SQL scripts in postprocessing.d, import.sh passes $SHELL into psql explicitly, which in turn executes backtick-ed code blocks using $SHELL.
+# Because the script inlined within those backticks/backquotes might rely on certain behavior, to achieve stability, we define this explicitly here, rather than relying on the implicit default from our base image.
+ENV SHELL=/bin/bash
+
 ENTRYPOINT []
 CMD ["/usr/local/bin/node", "importer.js"]
