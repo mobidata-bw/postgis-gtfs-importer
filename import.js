@@ -56,7 +56,7 @@ const importGtfsAtomically = async (cfg) => {
 		gtfsDownloadUserAgent: null,
 		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
-		determineDbsToRetain: oldDbs => oldDbs, // all
+		determineDbsToRetain: oldDbs => oldDbs.slice(-2), // keep most recent two
 		gtfsPostprocessingDPath: null,
 		...cfg,
 	}
@@ -144,6 +144,7 @@ const importGtfsAtomically = async (cfg) => {
 		{
 
 			const dbsToRetain = determineDbsToRetain(oldDbs)
+			logger.debug('dbs to retain: ' + dbsToRetain.map(db => db.name).join(', '))
 			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
 			if (prevImport && !dbsToRetain.some(({name}) => name === prevImport.name)) {
 				fail(`determineDbsToRetain() must retain the previous import "${prevImport.name}"`)
