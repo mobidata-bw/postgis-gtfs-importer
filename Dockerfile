@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.9
 # ^ needed for ADD --checksum=…
 
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 LABEL org.opencontainers.image.title="postgis-gtfs-importer"
 LABEL org.opencontainers.image.description="Imports GTFS data into a PostGIS database, using gtfstidy & gtfs-via-postgres."
