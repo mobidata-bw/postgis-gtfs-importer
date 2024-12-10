@@ -78,7 +78,7 @@ const importGtfsAtomically = async (cfg) => {
 		deletedDatabases: [], // [dbName]
 		retainedDatabases: null, // [dbName]
 		importSkipped: false,
-		database: null, // or {dbName, importedAt, feedDigest}
+		newImport: null, // or {dbName, importedAt, feedDigest}
 		importDurationMs: null,
 	}
 
@@ -160,7 +160,7 @@ const importGtfsAtomically = async (cfg) => {
 				if (dbsToRetain.includes(dbName)) {
 					continue;
 				}
-				const isRecentSuccessfulImport = latestSuccessfulImports.find(imp => imp.dbName === dbName)
+				const isRecentSuccessfulImport = latestSuccessfulImports.some(imp => imp.dbName === dbName)
 				if (isRecentSuccessfulImport) {
 					logger.info(`dropping database "${dbName}" containing a (recent) successful import`)
 				} else {
@@ -202,7 +202,7 @@ const importGtfsAtomically = async (cfg) => {
 			logger.info('GTFS feed digest has not changed, skipping import')
 			return result
 		}
-		result.database = {
+		result.newImport = {
 			dbName,
 			importedAt,
 			feedDigest: zipDigest,
