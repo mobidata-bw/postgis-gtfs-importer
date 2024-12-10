@@ -62,7 +62,7 @@ const importGtfsAtomically = async (cfg) => {
 		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
 		determineDbsToRetain: (latestSuccessfulImports, oldDbs) => {
-			return latestSuccessfulImports.slice(0, 2).map(_import => _import.name)
+			return latestSuccessfulImports.slice(0, 2).map(_import => _import.dbName)
 		},
 		continueOnFailureDeletingOldDb: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_DB === 'true',
 		gtfsPostprocessingDPath: null,
@@ -75,10 +75,10 @@ const importGtfsAtomically = async (cfg) => {
 
 	const result = {
 		downloadDurationMs: null,
-		deletedDatabases: [], // [{name, importedAt, feedDigest}]
-		retainedDatabases: null, // [{name, importedAt, feedDigest}]
+		deletedDatabases: [], // [dbName]
+		retainedDatabases: null, // [dbName]
 		importSkipped: false,
-		database: null, // or {name, importedAt, feedDigest}
+		database: null, // or {dbName, importedAt, feedDigest}
 		importDurationMs: null,
 	}
 
@@ -135,15 +135,15 @@ const importGtfsAtomically = async (cfg) => {
 		})
 		let prevImport = null
 		if (latestSuccessfulImports.length > 0) {
-			logger.info(`there are ${latestSuccessfulImports.length} (most recent) successful imports recorded in the bookkeeping DB: ${latestSuccessfulImports.map(imp => imp.name)}`)
+			logger.info(`there are ${latestSuccessfulImports.length} (most recent) successful imports recorded in the bookkeeping DB: ${latestSuccessfulImports.map(imp => imp.dbName)}`)
 			prevImport = latestSuccessfulImports[0]
 		}
 		logger.debug('all DBs, including old/unfinished imports: ' + allDbs.join(', '))
 		for (let i = 0; i < latestSuccessfulImports.length; i++) {
 			const prevImport = latestSuccessfulImports[i]
 
-			if (!allDbs.includes(prevImport.name)) {
-				logger.warn(`The "${successfulImportsTableName}" table points to a DB "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
+			if (!allDbs.includes(prevImport.dbName)) {
+				logger.warn(`The "${successfulImportsTableName}" table points to a DB "${prevImport.dbName}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
 				// remove from list
 				latestSuccessfulImports.splice(i, 1)
 				i--
@@ -160,7 +160,7 @@ const importGtfsAtomically = async (cfg) => {
 				if (dbsToRetain.includes(dbName)) {
 					continue;
 				}
-				const isRecentSuccessfulImport = latestSuccessfulImports.find(imp => imp.name === dbName)
+				const isRecentSuccessfulImport = latestSuccessfulImports.find(imp => imp.dbName === dbName)
 				if (isRecentSuccessfulImport) {
 					logger.info(`dropping database "${dbName}" containing a (recent) successful import`)
 				} else {
@@ -203,7 +203,7 @@ const importGtfsAtomically = async (cfg) => {
 			return result
 		}
 		result.database = {
-			name: dbName,
+			dbName,
 			importedAt,
 			feedDigest: zipDigest,
 		}
