@@ -183,8 +183,7 @@ const queryImports = async (cfg) => {
 			databaseNamePrefix,
 		])
 		latestSuccessfulImports = _rows.map(row => ({
-			// todo [breaking]: rename to `dbName`
-			name: row.db_name,
+			dbName: row.db_name,
 			importedAt: row.imported_at,
 			feedDigest: row.feed_digest,
 		}))
