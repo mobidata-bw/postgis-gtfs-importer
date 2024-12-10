@@ -221,9 +221,14 @@ const importGtfsAtomically = async (cfg) => {
 
 		logger.info(`marking the import into "${dbName}" as the latest`)
 		await client.query(`\
+			WITH updated AS (
+				UPDATE latest_import
+				SET db_name = $1
+				RETURNING *
+			)
 			INSERT INTO latest_import (db_name, always_true)
-			VALUES ($1, True)
-			ON CONFLICT (always_true) DO UPDATE SET db_name = $1;
+			SELECT $1, True
+			WHERE NOT EXISTS (SELECT * FROM updated);
 		`, [dbName])
 
 		if (pathToDsnFile !== null) {
