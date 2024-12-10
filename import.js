@@ -1,6 +1,6 @@
 import {fileURLToPath} from 'node:url'
 import pgFormat from 'pg-format'
-import {fail, ok} from 'node:assert'
+import {ok} from 'node:assert'
 import {writeFile} from 'node:fs/promises'
 import {
 	digestFile,
@@ -9,7 +9,11 @@ import {
 	getPgConfig,
 	getPgEnv,
 	connectToMetaDatabase,
-	readImportedDatabases,
+	successfulImportsTableName,
+	ensureSuccesfulImportsTableExists,
+	queryImports,
+	recordSuccessfulImport,
+	removeDbFromLatestSuccessfulImports,
 } from './index.js'
 
 // expose npm-installed local CLI tools to child processes
@@ -57,13 +61,8 @@ const importGtfsAtomically = async (cfg) => {
 		gtfsDownloadUserAgent: null,
 		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
-		// If the previous (successful) import is among the latest two, keep the latest two. Otherwise keep the latest and the previous import.
-		// todo: add tests for this surprisingly complex logic
-		determineDbsToRetain: (oldDbs, prevImport) => {
-			const latestTwo = oldDbs.slice(-2)
-			return prevImport && !latestTwo.find(db => db.name === prevImport.name)
-				? [prevImport, ...latestTwo.slice(-1)]
-				: latestTwo
+		determineDbsToRetain: (latestSuccessfulImports, oldDbs) => {
+			return latestSuccessfulImports.slice(0, 2).map(_import => _import.name)
 		},
 		continueOnFailureDeletingOldDb: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_DB === 'true',
 		gtfsPostprocessingDPath: null,
@@ -113,71 +112,80 @@ const importGtfsAtomically = async (cfg) => {
 
 	const client = await connectToMetaDatabase(cfg)
 
-	// We only ever keep one row in `latest_import`, which contains NULL in the beginning.
-	await client.query(`\
-		CREATE TABLE IF NOT EXISTS latest_import (
-			db_name TEXT,
-			always_true BOOLEAN DEFAULT True UNIQUE
-		);
-		INSERT INTO latest_import (db_name, always_true)
-		VALUES (NULL, True)
-		ON CONFLICT (always_true) DO NOTHING;
-	`)
+	await ensureSuccesfulImportsTableExists({
+		db: client,
+	})
 
 	await client.query('BEGIN')
 	try {
-		logger.info('obtaining exclusive lock on "latest_import", so that only one import can be running')
+		logger.info(`obtaining exclusive lock on "${successfulImportsTableName}", so that only one import can be running`)
 		// https://www.postgresql.org/docs/14/explicit-locking.html#LOCKING-TABLES
 		// > Conflicts with the ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. This mode allows only concurrent ACCESS SHARE locks, i.e., only reads from the table can proceed in parallel with a transaction holding this lock mode.
 		//> Only an ACCESS EXCLUSIVE lock blocks a SELECT (without FOR UPDATE/SHARE) statement.
-		await client.query('LOCK TABLE latest_import IN EXCLUSIVE MODE NOWAIT')
+		await client.query(pgFormat('LOCK TABLE %I IN EXCLUSIVE MODE NOWAIT', successfulImportsTableName))
 
 		logger.debug('checking previous imports')
 
 		let {
-			prevImport,
-			oldDbs,
-		} = await readImportedDatabases({
+			latestSuccessfulImports,
+			allDbs,
+		} = await queryImports({
 			databaseNamePrefix,
 			db: client,
 		})
-		if (prevImport !== null) {
-			logger.info(`latest import is in database "${prevImport.name}", keeping it until the new import has succeeded`)
+		let prevImport = null
+		if (latestSuccessfulImports.length > 0) {
+			logger.info(`there are ${latestSuccessfulImports.length} (most recent) successful imports recorded in the bookkeeping DB: ${latestSuccessfulImports.map(imp => imp.name)}`)
+			prevImport = latestSuccessfulImports[0]
 		}
-		logger.debug('old DBs, including previous import: ' + oldDbs.map(db => db.name).join(', '))
-		if (prevImport && !oldDbs.some(({name}) => name === prevImport.name)) {
-			logger.warn(`The latest_import table points to a database "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
-			prevImport = null
+		logger.debug('all DBs, including old/unfinished imports: ' + allDbs.join(', '))
+		for (let i = 0; i < latestSuccessfulImports.length; i++) {
+			const prevImport = latestSuccessfulImports[i]
+
+			if (!allDbs.includes(prevImport.name)) {
+				logger.warn(`The "${successfulImportsTableName}" table points to a DB "${prevImport.name}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
+				// remove from list
+				latestSuccessfulImports.splice(i, 1)
+				i--
+			}
 		}
 
 		{
-			const dbsToRetain = determineDbsToRetain(oldDbs, prevImport)
-			logger.debug('dbs to retain: ' + dbsToRetain.map(db => db.name).join(', '))
+			const dbsToRetain = determineDbsToRetain(latestSuccessfulImports, allDbs)
 			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
-			if (prevImport && !dbsToRetain.some(({name}) => name === prevImport.name)) {
-				fail(`determineDbsToRetain() must retain the previous import "${prevImport.name}"`)
-			}
+			logger.debug('dbs to retain: ' + dbsToRetain.join(', '))
 			result.retainedDatabases = dbsToRetain
 
-			const _dbsToRetain = new Set(dbsToRetain.map(db => db.name))
-			for (const oldDb of oldDbs) {
-				if (_dbsToRetain.has(oldDb.name)) {
+			for (const dbName of allDbs) {
+				if (dbsToRetain.includes(dbName)) {
 					continue;
 				}
-				logger.info(`dropping database "${oldDb.name}" containing an older or unfinished import`)
+				const isRecentSuccessfulImport = latestSuccessfulImports.find(imp => imp.name === dbName)
+				if (isRecentSuccessfulImport) {
+					logger.info(`dropping database "${dbName}" containing a (recent) successful import`)
+				} else {
+					logger.info(`dropping database "${dbName}" containing an older or unfinished import`)
+				}
+
 				// todo: `WITH (FORCE)`? – https://stackoverflow.com/a/68982312/1072129
 				try {
-					await dbMngmtClient.query(pgFormat('DROP DATABASE %I', oldDb.name))
-					result.deletedDatabases.push(oldDb)
+					await dbMngmtClient.query(pgFormat('DROP DATABASE %I', dbName))
+					result.deletedDatabases.push(dbName)
 				} catch (err) {
 					if (continueOnFailureDeletingOldDb) {
 						logger.warn({
 							error: err,
-							dbName: oldDb.name,
-						}, `failed to delete old database "${oldDb.name}"`)
+							dbName,
+						}, `failed to delete old database "${dbName}"`)
 					} else {
 						throw err
 					}
+				}
+				if (isRecentSuccessfulImport) {
+					await removeDbFromLatestSuccessfulImports({
+						db: client,
+						dbName,
+					})
 				}
 			}
 		}
@@ -234,16 +242,14 @@ const importGtfsAtomically = async (cfg) => {
 		logger.debug(`import succeeded in ${Math.round(result.importDurationMs / 1000)}s`)
 
 		logger.info(`marking the import into "${dbName}" as the latest`)
-		await client.query(`\
-			WITH updated AS (
-				UPDATE latest_import
-				SET db_name = $1
-				RETURNING *
-			)
-			INSERT INTO latest_import (db_name, always_true)
-			SELECT $1, True
-			WHERE NOT EXISTS (SELECT * FROM updated);
-		`, [dbName])
+		await recordSuccessfulImport({
+			db: client,
+			successfulImport: {
+				dbName,
+				importedAt,
+				feedDigest: zipDigest,
+			},
+		})
 
 		if (pathToDsnFile !== null) {
 			// https://www.pgbouncer.org/config.html#section-databases
@@ -266,7 +272,7 @@ const importGtfsAtomically = async (cfg) => {
 			await writeFile(pathToDsnFile, dsn)
 		}
 
-		logger.info('import succeeded, committing all changes to "latest_import"!')
+		logger.info(`import succeeded, committing all changes to "${successfulImportsTableName}"!`)
 		await client.query('COMMIT')
 	} catch (err) {
 		logger.warn('an error occured, rolling back')
