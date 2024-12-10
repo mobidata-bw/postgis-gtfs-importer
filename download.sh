@@ -19,7 +19,7 @@ print_bold "Downloading the GTFS feed from $GTFS_DOWNLOAD_URL."
 mkdir -p "$gtfs_tmp_dir"
 
 # custom curl-based HTTP mirroring/download script
-# > curl-mirror [--tmp-prefix …] [--log-level …] [--debug-curl] <url> <dest-path> [-- curl-opts...]
+# > curl-mirror [--tmp-prefix …] [--log-level …] <url> <dest-path> [-- curl-opts...]
 # see https://gist.github.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a
 	# --times \
 curl-mirror \

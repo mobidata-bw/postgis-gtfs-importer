@@ -163,6 +163,7 @@ const importGtfsAtomically = async (cfg) => {
 					continue;
 				}
 				logger.info(`dropping database "${oldDb.name}" containing an older or unfinished import`)
+				// todo: `WITH (FORCE)`? – https://stackoverflow.com/a/68982312/1072129
 				await dbMngmtClient.query(pgFormat('DROP DATABASE %I', oldDb.name))
 				result.deletedDatabases.push(oldDb)
 			}
