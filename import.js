@@ -41,6 +41,7 @@ const importGtfsAtomically = async (cfg) => {
 		tmpDir,
 		gtfstidyBeforeImport,
 		determineDbsToRetain,
+		continueOnFailureDeletingOldDb,
 		gtfsPostprocessingDPath,
 	} = {
 		logger: console,
@@ -64,6 +65,7 @@ const importGtfsAtomically = async (cfg) => {
 				? [prevImport, ...latestTwo.slice(-1)]
 				: latestTwo
 		},
+		continueOnFailureDeletingOldDb: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_DB === 'true',
 		gtfsPostprocessingDPath: null,
 		...cfg,
 	}
@@ -164,8 +166,19 @@ const importGtfsAtomically = async (cfg) => {
 				}
 				logger.info(`dropping database "${oldDb.name}" containing an older or unfinished import`)
 				// todo: `WITH (FORCE)`? – https://stackoverflow.com/a/68982312/1072129
-				await dbMngmtClient.query(pgFormat('DROP DATABASE %I', oldDb.name))
-				result.deletedDatabases.push(oldDb)
+				try {
+					await dbMngmtClient.query(pgFormat('DROP DATABASE %I', oldDb.name))
+					result.deletedDatabases.push(oldDb)
+				} catch (err) {
+					if (continueOnFailureDeletingOldDb) {
+						logger.warn({
+							error: err,
+							dbName: oldDb.name,
+						}, `failed to delete old database "${oldDb.name}"`)
+					} else {
+						throw err
+					}
+				}
 			}
 		}
 
