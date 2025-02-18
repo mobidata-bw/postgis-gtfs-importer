@@ -8,6 +8,15 @@ import pgFormat from 'pg-format'
 import {ok} from 'node:assert'
 
 const DIGEST_LENGTH = 6
+
+const digestString = (str) => {
+	return createHash('sha256')
+	.update(str)
+	.digest('hex')
+	.slice(0, DIGEST_LENGTH)
+	.toLowerCase()
+}
+
 const digestFile = async (pathToFile) => {
 	const hash = createHash('sha256')
 	for await (const chunk of createReadStream(pathToFile)) {
@@ -264,6 +273,7 @@ const removeDbFromLatestSuccessfulImports = async (cfg) => {
 }
 
 export {
+	digestString,
 	digestFile,
 	pSpawn,
 	formatDbName,
