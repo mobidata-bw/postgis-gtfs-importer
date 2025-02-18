@@ -43,12 +43,12 @@ const pSpawn = (path, args = [], opts = {}) => {
 	})
 }
 
-const formatDbName = ({databaseNamePrefix, importedAt, zipDigest}) => {
+const formatDbName = ({databaseNamePrefix, importedAt, feedDigest}) => {
 	return [
 		databaseNamePrefix,
 		importedAt,
 		'_',
-		zipDigest,
+		feedDigest,
 	].join('')
 }
 
