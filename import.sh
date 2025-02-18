@@ -8,7 +8,7 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 
 gtfs_path=''
 
-postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:-/etc/gtfs/postprocessing.d}"
+postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:?missing/empty}"
 
 verbose="${GTFS_IMPORTER_VERBOSE:-true}"
 if [ "$verbose" != false ]; then
