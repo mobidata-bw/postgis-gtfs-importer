@@ -206,7 +206,7 @@ const importGtfsAtomically = async (cfg) => {
 		logger.info(`importing data into "${dbName}"`)
 		const _importEnv = {
 			...process.env,
-			pgEnv,
+			...pgEnv,
 			PATH: NPM_BIN_DIR + ':' + process.env.PATH,
 			PGDATABASE: dbName,
 			GTFS_TMP_DIR: tmpDir,
