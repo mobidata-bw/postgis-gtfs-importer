@@ -65,7 +65,7 @@ const importGtfsAtomically = async (cfg) => {
 			return latestSuccessfulImports.slice(0, 2).map(_import => _import.dbName)
 		},
 		continueOnFailureDeletingOldDb: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_DB === 'true',
-		gtfsPostprocessingDPath: null,
+		gtfsPostprocessingDPath: process.env.GTFS_POSTPROCESSING_D_PATH || '/etc/gtfs/postprocessing.d',
 		...cfg,
 	}
 	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
