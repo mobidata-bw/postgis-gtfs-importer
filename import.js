@@ -191,13 +191,15 @@ const importGtfsAtomically = async (cfg) => {
 		}
 
 		const zipDigest = await digestFile(zipPath)
+		const feedDigest = zipDigest
+
 		const importedAt = (Date.now() / 1000 | 0)
 		const dbName = formatDbName({
 			databaseNamePrefix,
 			importedAt,
-			zipDigest,
+			feedDigest,
 		})
-		if (prevImport?.feedDigest === zipDigest) {
+		if (prevImport?.feedDigest === feedDigest) {
 			result.importSkipped = true
 			logger.info('GTFS feed digest has not changed, skipping import')
 			return result
@@ -205,7 +207,7 @@ const importGtfsAtomically = async (cfg) => {
 		result.newImport = {
 			dbName,
 			importedAt,
-			feedDigest: zipDigest,
+			feedDigest,
 		}
 
 		logger.debug(`creating database "${dbName}"`)
@@ -247,7 +249,7 @@ const importGtfsAtomically = async (cfg) => {
 			successfulImport: {
 				dbName,
 				importedAt,
-				feedDigest: zipDigest,
+				feedDigest,
 			},
 		})
 
