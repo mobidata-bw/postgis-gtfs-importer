@@ -27,7 +27,7 @@ After the GTFS has been imported but before the import is marked as successful, 
 
 You can configure access to the bookkeeping DB using the [standard `$PG…` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html).
 
-```
+```shell
 export PGDATABASE='…'
 export PGUSER='…'
 # …
@@ -59,3 +59,7 @@ If you run with `GTFSTIDY_BEFORE_IMPORT=false`, gtfstidy will not be used.
 If you set `$PATH_TO_DSN_FILE` to a file path, the importer will also write a [PostgreSQL key/value connection string (DSN)](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) to that path. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
 
 This feature is intended to be used with [PgBouncer](https://pgbouncer.org) for "dynamic" routing of PostgreSQL clients to the database containing the latest GTFS import.
+
+### Breaking Changes
+
+A new major version of `postgis-gtfs-importer` *does not* clean up imports done by the previous (major) versions.
