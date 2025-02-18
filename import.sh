@@ -127,6 +127,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 if [ -d "$postprocessing_d_path" ]; then
 	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
 	shopt -s nullglob
+	# todo: DRY this with the hash calculation in import.js
 	for file in "$postprocessing_d_path/"*; do
 		ext="${file##*.}"
 		if [ "$ext" = "sql" ]; then

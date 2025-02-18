@@ -12,13 +12,13 @@ First, the GTFS data is downloaded to, unzipped into and [tidied](https://github
 
 **Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of (the most recent) successful imports by – once an import has succeeded – writing its DB name into a table `latest_successful_imports` within a "meta bookkeeping database".
 
-The newly downloaded GTFS data will only get imported if it has changed since the last import. This is determined using the [SHA-256 digest](https://en.wikipedia.org/wiki/SHA-2).
+The newly downloaded GTFS data will only get imported if it has changed since the last import. This is determined using a [SHA-256 digest](https://en.wikipedia.org/wiki/SHA-2) of the GTFS dataset (and of the post-processing scripts, if configured, see below).
 
 Before each import, it also **deletes all imports but the most recent two** successful ones; This ensures that your disk won't overflow, but also that a rollback to the previous import is always possible.
 
 Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/14/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/14/explicit-locking.html) on on `latest_successful_imports` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up as part of the next import (see above).
 
-After the GTFS has been imported but before the import is marked as successful, it will run all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction (in the bookkeeping DB) as the GTFS import. Files ending in `.sql` will be run using `psql`, all other files are assumed executable scripts.
+After the GTFS has been imported but before the import is marked as successful, it will run all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction (in the bookkeeping DB) as the GTFS import. Files ending in `.sql` will be run using `psql`, all other files are assumed to be executable scripts. Note that the post-processing scripts also get hashed into the `$sha256_digest`, so if they change, the GTFS data will be imported again.
 
 
 ## Usage

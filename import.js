@@ -1,8 +1,12 @@
 import {fileURLToPath} from 'node:url'
 import pgFormat from 'pg-format'
 import {ok} from 'node:assert'
-import {writeFile} from 'node:fs/promises'
 import {
+	readdir,
+	writeFile,
+} from 'node:fs/promises'
+import {
+	digestString,
 	digestFile,
 	pSpawn,
 	formatDbName,
@@ -18,7 +22,10 @@ import {
 
 // expose npm-installed local CLI tools to child processes
 import {createRequire} from 'node:module'
-import {dirname} from 'node:path'
+import {
+	dirname,
+	join as pathJoin,
+} from 'node:path'
 // todo: use import.meta.resolve once it is stable?
 // see https://nodejs.org/docs/latest-v20.x/api/esm.html#importmetaresolvespecifier
 const require = createRequire(import.meta.url)
@@ -191,7 +198,33 @@ const importGtfsAtomically = async (cfg) => {
 		}
 
 		const zipDigest = await digestFile(zipPath)
-		const feedDigest = zipDigest
+		let feedDigest = zipDigest
+
+		// if $GTFS_POSTPROCESSING_D_PATH contains files, hash them into `feedDigest`
+		if (gtfsPostprocessingDPath !== null) {
+			let files = []
+			// todo: DRY this with the postprocessing logic in import.js
+			try {
+				const allFiles = await readdir(gtfsPostprocessingDPath)
+				// Bash `*` globs ignore dotfiles
+				files = allFiles.filter(filename => filename[0] !== '.')
+			} catch (err) {
+				// allow the postprocessing.d directory to be missing
+				if (err.code !== 'ENOENT') {
+					throw err
+				}
+			}
+
+			if (files.length > 0) {
+				let filesDigest = ''
+				logger.debug(`adding ${files.length} files' hashes to feed_digest`)
+				for (const file of files) {
+					const path = pathJoin(gtfsPostprocessingDPath, file)
+					filesDigest += await digestFile(path)
+				}
+				feedDigest = digestString(feedDigest + filesDigest)
+			}
+		}
 
 		const importedAt = (Date.now() / 1000 | 0)
 		const dbName = formatDbName({
