@@ -8,7 +8,7 @@
 		"postgis-gtfs-importer": "./importer.js"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=22"
 	},
 	"dependencies": {
 		"gtfs-via-postgres": "^4.10.0",
