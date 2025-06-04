@@ -8,7 +8,7 @@ The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.co
 
 ## How it works
 
-First, the GTFS data is downloaded to, unzipped into and [tidied](https://github.com/patrickbr/gtfstidy) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
+First, the GTFS data is downloaded to, unzipped into and [cleaned](https://github.com/public-transport/gtfsclean) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
 
 **Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of (the most recent) successful imports by – once an import has succeeded – writing its DB name into a table `latest_successful_imports` within a "meta bookkeeping database".
 
@@ -52,7 +52,7 @@ docker run --rm -it \
 
 You can configure access to the PostgreSQL by passing the [standard `PG*` environment variables](https://www.postgresql.org/docs/14/libpq-envars.html) into the container.
 
-If you run with `GTFSTIDY_BEFORE_IMPORT=false`, gtfstidy will not be used.
+If you run with `GTFSTIDY_BEFORE_IMPORT=false`, [gtfsclean](https://github.com/public-transport/gtfsclean) (a fork of [gtfstidy](https://github.com/patrickbr/gtfstidy)) will not be used.
 
 ### writing a DSN file
 

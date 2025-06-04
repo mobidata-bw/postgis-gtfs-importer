@@ -1,6 +1,23 @@
 # syntax=docker/dockerfile:1.9
 # ^ needed for ADD --checksum=…
 
+FROM golang:1-alpine AS gtfsclean
+
+WORKDIR /app
+
+# https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+RUN apk add --no-cache git file
+
+# todo: add git ref for reproducible builds?
+RUN git clone https://github.com/public-transport/gtfsclean.git .
+RUN env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
+	&& ls -lh gtfsclean \
+	&& file gtfsclean
+
 FROM node:22-bookworm-slim
 
 LABEL org.opencontainers.image.title="postgis-gtfs-importer"
@@ -43,12 +60,7 @@ RUN \
 	ln -s /opt/curl-mirror.mjs /usr/local/bin/curl-mirror && \
 	chmod +x /usr/local/bin/curl-mirror
 
-RUN \
-	curl -fsSL \
-	-H 'User-Agent: gtfs-importer (github.com/mobidata-bw/ipl-orchestration)' \
-	-o /usr/local/bin/gtfstidy \
-	"https://github.com/patrickbr/gtfstidy/releases/download/v0.2/gtfstidy.v0.2.$TARGETOS.$TARGETARCH" \
-	&& chmod +x /usr/local/bin/gtfstidy
+COPY --from=gtfsclean /app/gtfsclean /usr/local/bin/gtfsclean
 
 # todo: gtfs-via-postgres is Prosperity-dual-licensed, obtain a purely Apache-licensed version
 ADD package.json ./
