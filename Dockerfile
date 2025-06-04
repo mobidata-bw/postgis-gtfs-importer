@@ -1,7 +1,24 @@
 # syntax=docker/dockerfile:1.9
 # ^ needed for ADD --checksum=…
 
-FROM node:20-bookworm-slim
+FROM golang:1-alpine AS gtfsclean
+
+WORKDIR /app
+
+# https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+RUN apk add --no-cache git file
+
+# todo: add git ref for reproducible builds?
+RUN git clone https://github.com/public-transport/gtfsclean.git .
+RUN env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
+	&& ls -lh gtfsclean \
+	&& file gtfsclean
+
+FROM node:22-bookworm-slim
 
 LABEL org.opencontainers.image.title="postgis-gtfs-importer"
 LABEL org.opencontainers.image.description="Imports GTFS data into a PostGIS database, using gtfstidy & gtfs-via-postgres."
@@ -10,6 +27,7 @@ LABEL org.opencontainers.image.documentation="https://github.com/mobidata-bw/pos
 
 WORKDIR /importer
 
+# todo: what for?
 ENV TERM=xterm-256color
 
 # https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
@@ -30,7 +48,7 @@ RUN apt update && apt install -y \
 	zstd \
 	&& rm -rf /var/lib/apt/lists/*
 
-# > Alas, there is no way to tell node to interpret a file with an arbitrary extension as an ESM module. That’s why we have to use the extension .mjs. Workarounds are possible but complicated, as we’ll see later.
+# > Alas, there is no way to tell Node.js to interpret a file with an arbitrary extension as an ESM module. That’s why we have to use the extension .mjs. Workarounds are possible but complicated, as we’ll see later.
 # https://exploringjs.com/nodejs-shell-scripting/ch_creating-shell-scripts.html#node.js-esm-modules-as-standalone-shell-scripts-on-unix
 # > A script such as homedir.mjs does not need to be executable on Unix because npm installs it via an executable symbolic link […].
 # https://exploringjs.com/nodejs-shell-scripting/ch_creating-shell-scripts.html#how-npm-installs-shell-scripts
@@ -42,12 +60,7 @@ RUN \
 	ln -s /opt/curl-mirror.mjs /usr/local/bin/curl-mirror && \
 	chmod +x /usr/local/bin/curl-mirror
 
-RUN \
-	curl -fsSL \
-	-H 'User-Agent: gtfs-importer (github.com/mobidata-bw/ipl-orchestration)' \
-	-o /usr/local/bin/gtfstidy \
-	"https://github.com/patrickbr/gtfstidy/releases/download/v0.2/gtfstidy.v0.2.$TARGETOS.$TARGETARCH" \
-	&& chmod +x /usr/local/bin/gtfstidy
+COPY --from=gtfsclean /app/gtfsclean /usr/local/bin/gtfsclean
 
 # todo: gtfs-via-postgres is Prosperity-dual-licensed, obtain a purely Apache-licensed version
 ADD package.json ./
