@@ -9,7 +9,7 @@ updates:
     directory: '/'
     schedule:
       interval: weekly
-  # We also want major upgrades for npm packages.
+  # We don't want major upgrades for npm packages.
   - package-ecosystem: npm
     directory: '/'
     ignore:

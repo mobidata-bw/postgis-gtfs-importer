@@ -19,6 +19,8 @@ jobs:
     - name: checkout
       uses: actions/checkout@v5
 
+    - name: set up QEMU for cross-platform Docker builds
+      uses: docker/setup-qemu-action@v3
     - name: set up Docker buildx
       uses: docker/setup-buildx-action@v3
 
@@ -52,7 +54,7 @@ jobs:
           ghcr.io/${{ github.repository }}:v5
           ghcr.io/${{ github.repository }}:${{ steps.docker-tags.outputs.permanent-tag }}
         labels: ${{ steps.docker-metadata.outputs.labels }}
-        platforms: linux/amd64
+        platforms: linux/amd64,linux/arm64
         # https://docs.docker.com/build/ci/github-actions/cache/#cache-backend-api
         cache-from: type=gha
         cache-to: type=gha,mode=max
