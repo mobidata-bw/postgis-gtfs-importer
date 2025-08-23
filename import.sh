@@ -8,7 +8,7 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 
 gtfs_path=''
 
-postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:-/etc/gtfs/postprocessing.d}"
+postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:?missing/empty}"
 
 verbose="${GTFS_IMPORTER_VERBOSE:-true}"
 if [ "$verbose" != false ]; then
@@ -34,8 +34,9 @@ if [[ -f '/etc/gtfs/preprocess.sh' ]]; then
 	/etc/gtfs/preprocess.sh "$gtfs_path"
 fi
 
+# Note: We're using gtfsclean, a fork of gtfstidy, but keep the flags backwards-compatible.
 if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
-	print_bold "Tidying GTFS feed using gtfstidy."
+	print_bold "Tidying GTFS feed using gtfsclean."
 	# Remove any leftovers from previous runs (e.g. pathways.txt/levels.txt)
 	rm -rf "$tidied_path"
 
@@ -60,7 +61,13 @@ if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	fi
 
 	# minimization
-	# Note: In later versions of gtfstidy, --keep-ids and --keep-additional-fields will be introduced.
+	# todo: default to true once https://github.com/public-transport/gtfsclean/issues/12 is fixed
+	if [ "${GTFSTIDY_KEEP_ADDITIONAL_FIELDS:-false}" == true ]; then
+		gtfstidy_args+=('--keep-additional-fields') # -F
+	fi
+	if [ "${GTFSTIDY_KEEP_IDS:-true}" != false ]; then
+		gtfstidy_args+=('--keep-ids')
+	fi
 	if [ "${GTFSTIDY_MIN_SHAPES:-true}" != false ]; then
 		gtfstidy_args+=('--min-shapes') # -s
 	fi
@@ -95,7 +102,7 @@ if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	# todo: allow configuring additional flags
 	set -x
 
-	gtfstidy \
+	gtfsclean \
 		"${gtfstidy_args[@]}" \
 		-o "$tidied_path" \
 		"$gtfs_path" \
@@ -127,6 +134,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 if [ -d "$postprocessing_d_path" ]; then
 	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
 	shopt -s nullglob
+	# todo: DRY this with the hash calculation in import.js
 	for file in "$postprocessing_d_path/"*; do
 		ext="${file##*.}"
 		if [ "$ext" = "sql" ]; then
