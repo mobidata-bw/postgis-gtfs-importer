@@ -30,11 +30,6 @@ WORKDIR /importer
 # todo: what for?
 ENV TERM=xterm-256color
 
-# https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETVARIANT
-
 # curl is needed to download the GTFS
 # moreutils is needed for sponge
 # postgresql-client is needed for psql
