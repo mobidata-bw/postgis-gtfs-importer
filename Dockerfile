@@ -5,15 +5,14 @@ FROM golang:1-alpine AS gtfsclean
 
 WORKDIR /app
 
-# https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETVARIANT
+# Commit for snapshot 5 of public-transport/gtfsclean
+# https://github.com/public-transport/gtfsclean/releases/tag/snapshot-5
+ARG GTFSCLEAN_GIT_REF=bb3ea74f66ef9bc07dc1bd038c3f653e10f0ade0
 
 RUN apk add --no-cache git file
 
-# todo: add git ref for reproducible builds?
-RUN git clone https://github.com/public-transport/gtfsclean.git .
+RUN git clone --depth 1 --revision=${GTFSCLEAN_GIT_REF} https://github.com/public-transport/gtfsclean.git .
+
 RUN env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
 	&& ls -lh gtfsclean \
 	&& file gtfsclean
