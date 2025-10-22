@@ -5,8 +5,8 @@ FROM golang:1-alpine AS gtfsclean
 
 WORKDIR /app
 
-# Commit for snapshot 5 of public-transport/gtfsclean
-# https://github.com/public-transport/gtfsclean/releases/tag/snapshot-5
+# https://github.com/public-transport/gtfsclean
+# kept up-to-date by Renovate Bot
 ARG GTFSCLEAN_GIT_REF=bb3ea74f66ef9bc07dc1bd038c3f653e10f0ade0
 
 RUN apk add --no-cache git file

@@ -3,4 +3,23 @@
   "extends": [
     "config:recommended",
   ],
+
+  "customManagers": [
+    // keep `ARG GTFSCLEAN_GIT_REF=…` in Dockerfile up-to-date
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Dockerfile$/",
+      ],
+      "matchStrings": [
+        // for some reason `^` & `$` don't work here, so we fall back to `\b` :(
+        "\\bARG\\s+GTFSCLEAN_GIT_REF=(?<currentDigest>.+?)\\b",
+      ],
+      "currentValueTemplate": "master",
+      "depNameTemplate": "https://github.com/public-transport/gtfsclean",
+      "packageNameTemplate": "https://github.com/public-transport/gtfsclean",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "git",
+    },
+  ],
 }
