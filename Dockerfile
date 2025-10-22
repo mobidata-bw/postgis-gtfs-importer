@@ -13,7 +13,9 @@ RUN apk add --no-cache git file
 
 RUN git clone --depth 1 --revision=${GTFSCLEAN_GIT_REF} https://github.com/public-transport/gtfsclean.git .
 
-RUN env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
+# golang:1-alpine sets $GOPATH to /go
+RUN --mount=type=cache,id=go-build,target=/go \
+	env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
 	&& ls -lh gtfsclean \
 	&& file gtfsclean
 
