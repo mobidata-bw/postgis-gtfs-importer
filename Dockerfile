@@ -17,7 +17,8 @@ RUN git clone --depth 1 --revision=${GTFSCLEAN_GIT_REF} https://github.com/publi
 RUN --mount=type=cache,id=go-build,target=/go \
 	env GOOS=linux GOARCH=arm64 GOARM=v8 go build \
 	&& ls -lh gtfsclean \
-	&& file gtfsclean
+	&& file gtfsclean \
+	&& ./gtfsclean --help 2>/dev/null
 
 FROM node:22-bookworm-slim
 
