@@ -7,7 +7,7 @@ WORKDIR /app
 
 # https://github.com/public-transport/gtfsclean
 # kept up-to-date by Renovate Bot
-ARG GTFSCLEAN_GIT_REF=bb3ea74f66ef9bc07dc1bd038c3f653e10f0ade0
+ARG GTFSCLEAN_GIT_REF=8a1a1ee8d37e57afb238302691574b6bae3f681b
 
 RUN apk add --no-cache git file
 
