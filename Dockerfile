@@ -20,7 +20,7 @@ RUN --mount=type=cache,id=go-build,target=/go \
 	&& file gtfsclean \
 	&& ./gtfsclean --help 2>/dev/null
 
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 LABEL org.opencontainers.image.title="postgis-gtfs-importer"
 LABEL org.opencontainers.image.description="Imports GTFS data into a PostGIS database, using gtfstidy & gtfs-via-postgres."
