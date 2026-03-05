@@ -41,7 +41,7 @@ jobs:
 
     - name: compute Docker image OCI metadata from commit & repo
       id: docker-metadata
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6
       with:
         labels: |
           org.opencontainers.image.version=${{ steps.docker-tags.outputs.oci-version }}
