@@ -7,7 +7,9 @@ const {Client} = _pg
 import pgFormat from 'pg-format'
 import {ok} from 'node:assert'
 
-const DIGEST_LENGTH = 6
+// Note: We keep compatibility with the "GTFS-RT content negotiation for multiple Schedule feeds" proposal here.
+// see also https://gist.github.com/derhuerst/f0b6c9cf28b90746770464eb8e5b918f
+const DIGEST_LENGTH = 8
 
 const digestString = (str) => {
 	return createHash('sha256')
