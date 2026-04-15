@@ -175,7 +175,7 @@ const queryImports = async (cfg) => {
 	}
 
 	let latestSuccessfulImports = []
-	let allDbs = []
+	let allDbs
 	try {
 		// todo: use pg-format?
 		const {
