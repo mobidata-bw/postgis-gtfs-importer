@@ -33,11 +33,10 @@ jobs:
 
     - name: compute Docker image tag
       id: docker-tags
-      # todo [breaking]: remove commit hash from tag? there is the OCI metadata annotation `org.opencontainers.image.revision`
       run: |
         oci_version="v6-$(date +"%Y-%m-%dT%H.%M.%S")"
         echo "oci-version=$oci_version" >>$GITHUB_OUTPUT
-        echo "permanent-tag=$oci_version-${GITHUB_SHA:0:7}" >>$GITHUB_OUTPUT
+        echo "permanent-tag=$oci_version" >>$GITHUB_OUTPUT
 
     - name: compute Docker image OCI metadata from commit & repo
       id: docker-metadata
