@@ -3,7 +3,7 @@ name: build & publish Docker image
 on:
   push:
     branches:
-      - v5
+      - v6
 
 jobs:
   lint-test:
@@ -35,7 +35,7 @@ jobs:
       id: docker-tags
       # todo [breaking]: remove commit hash from tag? there is the OCI metadata annotation `org.opencontainers.image.revision`
       run: |
-        oci_version="v5-$(date +"%Y-%m-%dT%H.%M.%S")"
+        oci_version="v6-$(date +"%Y-%m-%dT%H.%M.%S")"
         echo "oci-version=$oci_version" >>$GITHUB_OUTPUT
         echo "permanent-tag=$oci_version-${GITHUB_SHA:0:7}" >>$GITHUB_OUTPUT
 
@@ -51,7 +51,7 @@ jobs:
       with:
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:v5
+          ghcr.io/${{ github.repository }}:v6
           ghcr.io/${{ github.repository }}:${{ steps.docker-tags.outputs.permanent-tag }}
         labels: ${{ steps.docker-metadata.outputs.labels }}
         platforms: linux/amd64,linux/arm64
