@@ -63,3 +63,8 @@ This feature is intended to be used with [PgBouncer](https://pgbouncer.org) for 
 ### Breaking Changes
 
 A new major version of `postgis-gtfs-importer` *does not* clean up imports done by the previous (major) versions.
+
+
+## Related
+
+- [duckdb-gtfs-importer](https://github.com/OpenDataVBB/duckdb-gtfs-importer) – Imports GTFS data into a DuckDB database using gtfs-via-duckdb.
