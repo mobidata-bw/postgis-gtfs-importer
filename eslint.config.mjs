@@ -9,7 +9,7 @@ export default defineConfig([
             globals: {
                 ...globals.node,
             },
-            ecmaVersion: 2023,
+            ecmaVersion: 2025,
             sourceType: 'module',
         },
 
