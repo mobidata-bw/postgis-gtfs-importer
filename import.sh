@@ -80,22 +80,22 @@ if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	if [ "${GTFSTIDY_DELETE_ORPHANS:-true}" != false ]; then
 		gtfstidy_args+=('--delete-orphans') # -O
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_AGENCIES:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_AGENCIES:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-agencies') # -A
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_ROUTES:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_ROUTES:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-routes') # -R
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SERVICES:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SERVICES:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-services') # -C
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SHAPES:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_SHAPES:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-shapes') # -S
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_STOPS:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_STOPS:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-stops') # -P
 	fi
-	if [ "${GTFSTIDY_REMOVE_REDUNDANT_TRIPS:-true}" != false ]; then
+	if [ "${GTFSTIDY_REMOVE_REDUNDANT_TRIPS:-false}" != false ]; then
 		gtfstidy_args+=('--remove-red-trips') # -I
 	fi
 
