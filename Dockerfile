@@ -56,8 +56,8 @@ RUN apt update && apt install -y \
 # > A script such as homedir.mjs does not need to be executable on Unix because npm installs it via an executable symbolic link […].
 # https://exploringjs.com/nodejs-shell-scripting/ch_creating-shell-scripts.html#how-npm-installs-shell-scripts
 ADD \
-	--checksum=sha256:59bb1efdeef33ea380f1035fae0c3810a3063de2f400d0542695ab1bc8b9f95d \
-	https://gist.github.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a/raw/cefaf64e2dd5bfde30de12017c4823cdc89ac64c/mirror.mjs \
+	--checksum=sha256:3d1a5454e0684149bc426d79345f6677b39da293209be372d0b87c04a7c409f0 \
+	https://gist.githubusercontent.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a/raw/27aa4919b5676abda8f9e0d90c3ec43d0d63f3d7/mirror.mjs \
 	/opt/curl-mirror.mjs
 RUN \
 	ln -s /opt/curl-mirror.mjs /usr/local/bin/curl-mirror && \
