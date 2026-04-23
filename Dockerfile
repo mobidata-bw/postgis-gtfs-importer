@@ -14,7 +14,7 @@ RUN apk add --no-cache git file
 
 # https://github.com/public-transport/gtfsclean
 # kept up-to-date by Renovate Bot
-ARG GTFSCLEAN_GIT_REF=8a1a1ee8d37e57afb238302691574b6bae3f681b
+ARG GTFSCLEAN_GIT_REF=85be04d0f61ea5c6a407041ef9c74011c3545b83
 RUN git clone -q --depth 1 --revision=${GTFSCLEAN_GIT_REF} https://github.com/public-transport/gtfsclean.git .
 
 # golang:1-alpine sets $GOPATH to /go
