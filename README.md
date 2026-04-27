@@ -23,9 +23,8 @@ After the GTFS has been imported but before the import is marked as successful, 
 
 ## Usage
 
-> [!IMPORTANT]
-> `gtfs-via-postgres` uses the [`COPY FROM STDIN csv` command](https://www.postgresql.org/docs/14/sql-copy.html), which [PostgreSQL >=18 changed in a way that it doesn't work with `psql` <18](https://www.postgresql.org/message-id/20240719.151031.622666269892202885.kou%40clear-code.com).
-> Because it uses Debian 13 (Trixie) underneath which uses `psql` v17, `postgis-gtfs-importer` currently cannot be used with PostgreSQL >=18.
+> [!NOTE]
+> `postgis-gtfs-importer` currently uses `psql` (PostgreSQL client) v18, so it may not work when used with PostgreSQL servers >18.
 
 ### Prerequisites
 

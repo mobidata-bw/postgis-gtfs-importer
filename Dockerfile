@@ -26,7 +26,7 @@ RUN --mount=type=cache,id=go-build,target=/go \
 	&& file gtfsclean \
 	&& ./gtfsclean --help 2>/dev/null
 
-FROM node:24-trixie-slim
+FROM node:24-alpine3.23
 
 LABEL org.opencontainers.image.title="postgis-gtfs-importer"
 LABEL org.opencontainers.image.description="Imports GTFS data into a PostGIS database, using gtfstidy & gtfs-via-postgres."
@@ -40,16 +40,17 @@ ENV TERM=xterm-256color
 
 # curl is needed to download the GTFS
 # moreutils is needed for sponge
+# ncurses is needed for tput
 # postgresql-client is needed for psql
 # note: curl-mirror.mjs would need gunzip *if* the HTTP response was gzipped
-RUN apt update && apt install -y \
+RUN apk update && apk add --no-cache \
 	bash \
 	curl \
 	moreutils \
+	ncurses \
 	postgresql-client \
 	unzip \
-	zstd \
-	&& rm -rf /var/lib/apt/lists/*
+	zstd
 
 # > Alas, there is no way to tell Node.js to interpret a file with an arbitrary extension as an ESM module. That’s why we have to use the extension .mjs. Workarounds are possible but complicated, as we’ll see later.
 # https://exploringjs.com/nodejs-shell-scripting/ch_creating-shell-scripts.html#node.js-esm-modules-as-standalone-shell-scripts-on-unix
