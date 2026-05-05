@@ -1,7 +1,7 @@
 {
 	"private": true,
 	"name": "postgis-gtfs-importer",
-	"version": "v6",
+	"version": "v7",
 	"type": "module",
 	"main": "index.js",
 	"bin": {

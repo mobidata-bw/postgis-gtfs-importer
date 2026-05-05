@@ -49,7 +49,7 @@ docker run --rm -it \
 	-v $PWD/gtfs-tmp:/tmp/gtfs \
 	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
 	-e 'GTFS_DOWNLOAD_URL=…' \
-	ghcr.io/mobidata-bw/postgis-gtfs-importer:v6
+	ghcr.io/mobidata-bw/postgis-gtfs-importer:v7
 ```
 
 *Note:* We mount a `gtfs-tmp` directory to prevent it from re-downloading the GTFS dataset every time, even when it hasn't changed.
