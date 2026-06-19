@@ -48,6 +48,7 @@ docker run --rm -it \
 	-v $PWD/gtfs-tmp:/tmp/gtfs \
 	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
 	-e 'GTFS_DOWNLOAD_URL=…' \
+	-e 'GTFS_IMPORTER_DB_PREFIX=my_feed' \
 	ghcr.io/mobidata-bw/postgis-gtfs-importer:v7
 ```
 
