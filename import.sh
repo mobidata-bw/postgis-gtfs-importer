@@ -120,6 +120,8 @@ if [ "$verbose" = false ]; then
 	psql_args+=('--quiet')
 	gtfs_to_sql_args+=('--silent')
 fi
+# e.g. GTFS_TO_SQL_ADDITIONAL_ARGS='--route-types-scheme google-extended' for Swiss GTFS feeds
+read -a gtfs_to_sql_additional_args <<< "${GTFS_TO_SQL_ADDITIONAL_ARGS:-}"
 
 gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 	--trips-without-shape-id --lower-case-lang-codes \
@@ -127,6 +129,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 	--import-metadata \
 	--schema "${GTFS_IMPORTER_SCHEMA:-public}" \
 	--postgrest \
+	"${gtfs_to_sql_additional_args[@]}" \
 	"$gtfs_path/"*.txt \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1' "${psql_args[@]}"

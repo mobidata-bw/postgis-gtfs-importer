@@ -58,6 +58,14 @@ You can configure access to the PostgreSQL by passing the [standard `PG*` enviro
 
 If you run with `GTFSTIDY_BEFORE_IMPORT=false`, [gtfsclean](https://github.com/public-transport/gtfsclean) (a fork of [gtfstidy](https://github.com/patrickbr/gtfstidy)) will not be used.
 
+You can pass additional options to the underlying [`gtfs-to-sql`](https://github.com/public-transport/gtfs-via-postgres) command using `$GTFS_TO_SQL_ADDITIONAL_ARGS`, e.g. to import a GTFS feed using [extended route types](https://developers.google.com/transit/gtfs/reference/extended-route-types) (as used e.g. by Swiss GTFS feeds):
+
+```shell
+-e 'GTFS_TO_SQL_ADDITIONAL_ARGS=--route-types-scheme google-extended'
+```
+
+Keep in mind that `\` characters in `$GTFS_TO_SQL_ADDITIONAL_ARGS` will be interpreted because the variable is processed using Bash's `read` *without* the `-r` flag. For example, setting `GTFS_TO_SQL_ADDITIONAL_ARGS='--foo bar\ baz'` will pass *two* arguments `--foo` & `bar baz` to `gtfs-to-sql`.
+
 ### writing a DSN file
 
 If you set `$PATH_TO_DSN_FILE` to a file path, the importer will also write a [PostgreSQL key/value connection string (DSN)](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) to that path. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
