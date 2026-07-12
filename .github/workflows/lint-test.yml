@@ -19,7 +19,7 @@ jobs:
           - '24'
     steps:
     - name: checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: setup Node v${{ matrix.node-version }}
       uses: actions/setup-node@v6
