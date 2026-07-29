@@ -126,9 +126,10 @@ const importGtfsAtomically = async (cfg) => {
 	await client.query('BEGIN')
 	try {
 		logger.info(`obtaining exclusive lock on "${successfulImportsTableName}", so that only one import can be running`)
-		// https://www.postgresql.org/docs/14/explicit-locking.html#LOCKING-TABLES
+		// https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-TABLES
 		// > Conflicts with the ROW SHARE, ROW EXCLUSIVE, SHARE UPDATE EXCLUSIVE, SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, and ACCESS EXCLUSIVE lock modes. This mode allows only concurrent ACCESS SHARE locks, i.e., only reads from the table can proceed in parallel with a transaction holding this lock mode.
-		//> Only an ACCESS EXCLUSIVE lock blocks a SELECT (without FOR UPDATE/SHARE) statement.
+		// > […]
+		// > Only an ACCESS EXCLUSIVE lock blocks a SELECT (without FOR UPDATE/SHARE) statement.
 		await client.query(pgFormat('LOCK TABLE %I IN EXCLUSIVE MODE NOWAIT', successfulImportsTableName))
 
 		logger.debug('checking previous imports')
