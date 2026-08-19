@@ -3,7 +3,7 @@ name: build & publish Docker image
 on:
   push:
     branches:
-      - v7
+      - v8
 
 jobs:
   lint-test:
@@ -34,7 +34,7 @@ jobs:
     - name: compute Docker image tag
       id: docker-tags
       run: |
-        oci_version="v7-$(date +"%Y-%m-%dT%H.%M.%S")"
+        oci_version="v8-$(date +"%Y-%m-%dT%H.%M.%S")"
         echo "oci-version=$oci_version" >>$GITHUB_OUTPUT
         echo "permanent-tag=$oci_version" >>$GITHUB_OUTPUT
 
@@ -50,7 +50,7 @@ jobs:
       with:
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:v7
+          ghcr.io/${{ github.repository }}:v8
           ghcr.io/${{ github.repository }}:${{ steps.docker-tags.outputs.permanent-tag }}
         labels: ${{ steps.docker-metadata.outputs.labels }}
         platforms: linux/amd64,linux/arm64
