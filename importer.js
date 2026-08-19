@@ -13,14 +13,14 @@ if (!GTFS_DOWNLOAD_URL) {
 	process.exit(1)
 }
 
-const GTFS_IMPORTER_DB_PREFIX = process.env.GTFS_IMPORTER_DB_PREFIX
-if (!GTFS_IMPORTER_DB_PREFIX) {
-	console.error('Missing/empty $GTFS_IMPORTER_DB_PREFIX.')
+const GTFS_IMPORTER_SCHEMA_PREFIX = process.env.GTFS_IMPORTER_SCHEMA_PREFIX
+if (!GTFS_IMPORTER_SCHEMA_PREFIX) {
+	console.error('Missing/empty $GTFS_IMPORTER_SCHEMA_PREFIX.')
 	process.exit(1)
 }
 
 await importGtfsAtomically({
 	gtfsDownloadUserAgent: GTFS_DOWNLOAD_USER_AGENT,
 	gtfsDownloadUrl: GTFS_DOWNLOAD_URL,
-	databaseNamePrefix: GTFS_IMPORTER_DB_PREFIX + '_',
+	schemaNamePrefix: GTFS_IMPORTER_SCHEMA_PREFIX + '_',
 })

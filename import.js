@@ -9,15 +9,15 @@ import {
 	digestString,
 	digestFile,
 	pSpawn,
-	formatDbName,
+	formatSchemaName,
 	getPgConfig,
 	getPgEnv,
-	connectToMetaDatabase,
+	connectToDatabase,
 	successfulImportsTableName,
 	ensureSuccesfulImportsTableExists,
 	queryImports,
 	recordSuccessfulImport,
-	removeDbFromLatestSuccessfulImports,
+	removeImportFromLatestSuccessfulImports,
 } from './index.js'
 
 // expose npm-installed local CLI tools to child processes
@@ -34,6 +34,7 @@ const NPM_BIN_DIR = dirname(dirname(GTFS_VIA_POSTGRES_PKG)) + '/.bin'
 
 const PATH_TO_IMPORT_SCRIPT = fileURLToPath(new URL('import.sh', import.meta.url).href)
 const PATH_TO_DOWNLOAD_SCRIPT = fileURLToPath(new URL('download.sh', import.meta.url).href)
+const PATH_TO_POST_IMPORT_SCRIPT = fileURLToPath(new URL('post-import.sh', import.meta.url).href)
 
 const importGtfsAtomically = async (cfg) => {
 	const {
@@ -42,50 +43,58 @@ const importGtfsAtomically = async (cfg) => {
 		connectDownloadScriptToStdout,
 		importScriptVerbose,
 		connectImportScriptToStdout,
-		databaseNamePrefix,
-		schemaName,
+		schemaNamePrefix,
+		schemaName, // todo: rename to `metaSchemaName`?
 		pathToImportScript,
 		pathToDownloadScript,
-		pathToDsnFile,
+		pathToPostImportScript,
+		pathToEnvFile,
 		gtfsDownloadUrl,
 		gtfsDownloadUserAgent,
 		tmpDir,
 		gtfstidyBeforeImport,
-		determineDbsToRetain,
-		continueOnFailureDeletingOldDb,
+		determineImportsToRetain,
+		continueOnFailureDeletingOldImport,
 		gtfsPostprocessingDPath,
+		// gtfsPostImportDPath,
 	} = {
 		logger: console,
 		downloadScriptVerbose: true,
 		connectDownloadScriptToStdout: true,
 		importScriptVerbose: true,
 		connectImportScriptToStdout: true,
-		schemaName: process.env.GTFS_IMPORTER_SCHEMA || null,
+		schemaName: process.env.GTFS_IMPORTER_SCHEMA || 'public',
 		pathToImportScript: process.env.GTFS_IMPORT_SCRIPT || PATH_TO_IMPORT_SCRIPT,
 		pathToDownloadScript: process.env.GTFS_DOWNLOAD_SCRIPT || PATH_TO_DOWNLOAD_SCRIPT,
-		pathToDsnFile: process.env.GTFS_IMPORTER_DSN_FILE || null,
+		pathToPostImportScript: process.env.GTFS_POST_IMPORT_SCRIPT || PATH_TO_POST_IMPORT_SCRIPT,
+		pathToEnvFile: process.env.GTFS_IMPORTER_ENV_FILE || null,
 		gtfsDownloadUrl: null,
 		gtfsDownloadUserAgent: null,
 		tmpDir: process.env.GTFS_TMP_DIR || '/tmp/gtfs',
 		gtfstidyBeforeImport: null, // or `true` or `false`
-		determineDbsToRetain: (latestSuccessfulImports, oldDbs) => {
-			return latestSuccessfulImports.slice(0, 2).map(_import => _import.dbName)
+		determineImportsToRetain: (latestSuccessfulImports, oldSchemas) => {
+			return latestSuccessfulImports.slice(0, 2).map(_import => _import.schemaName)
 		},
-		continueOnFailureDeletingOldDb: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_DB === 'true',
+		continueOnFailureDeletingOldImport: process.env.GTFS_IMPORTED_CONTINUE_ON_FAILURE_DELETING_OLD_IMPORT === 'true',
 		gtfsPostprocessingDPath: process.env.GTFS_POSTPROCESSING_D_PATH || '/etc/gtfs/postprocessing.d',
+		// gtfsPostImportDPath: null,
 		...cfg,
 	}
-	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
+	ok(schemaNamePrefix, 'missing/empty cfg.schemaNamePrefix')
 	ok(pathToImportScript, 'missing/empty cfg.pathToImportScript')
+	ok(pathToDownloadScript, 'missing/empty cfg.pathToDownloadScript')
+	ok(pathToPostImportScript, 'missing/empty cfg.pathPostToImportScript')
 	ok(gtfsDownloadUrl, 'missing/empty cfg.gtfsDownloadUrl')
 	ok(gtfsDownloadUserAgent, 'missing/empty cfg.gtfsDownloadUserAgent')
 
+	// todo: debug-log current git ref
+
 	const result = {
 		downloadDurationMs: null,
-		deletedDatabases: [], // [dbName]
-		retainedDatabases: null, // [dbName]
+		deletedSchemas: [], // [schemaName]
+		retainedSchemas: null, // [schemaName]
 		importSkipped: false,
-		newImport: null, // or {dbName, importedAt, feedDigest}
+		newImport: null, // or {schemaName, importedAt, feedDigest}
 		importDurationMs: null,
 	}
 
@@ -112,15 +121,22 @@ const importGtfsAtomically = async (cfg) => {
 	const pgConfig = await getPgConfig(cfg)
 	const pgEnv = getPgEnv(pgConfig)
 
-	// `CREATE/DROP DATABASE` can't be run within the transation, so we need need a separate client for it.
-	// Thus, a newly created database also won't be removed if the transaction fails or is aborted, so we
-	// have to drop it manually when cleaning up failed/aborted imports.
-	const dbMngmtClient = await connectToMetaDatabase(cfg)
-
-	const client = await connectToMetaDatabase(cfg)
+	// All of postgis-gtfs-importer's operations would have to run in a transaction to ensure consistent/atomic behaviour:
+	// 1. reading from the latest imports table
+	// 2. deleting old imports' schemas
+	// 3. creating the new import's schema
+	// 4. importing the GTFS data
+	// 5. running post-processing scripts on the imported data
+	// 6. in the imports table, marking the new import as the latest
+	// However, because the actual import script (import.sh, doing steps 3-5) opens its own DB connection and transactions are connection-bound, we cannot run steps 1-2 & 6 in the same transaction. Therefore, we implement a workaround by
+	// - introducing a "bookkeeping table", which only update after the import has finished successfully, and
+	// - only considering an import usable once it has an entry in the bookkeeping table.
+	// To do this, this file needs its own DB client.
+	const client = await connectToDatabase(cfg)
 
 	await ensureSuccesfulImportsTableExists({
 		db: client,
+		schemaName,
 	})
 
 	await client.query('BEGIN')
@@ -136,22 +152,23 @@ const importGtfsAtomically = async (cfg) => {
 
 		let {
 			latestSuccessfulImports,
-			allDbs,
+			allSchemas,
 		} = await queryImports({
-			databaseNamePrefix,
+			schemaNamePrefix,
 			db: client,
 		})
 		let prevImport = null
 		if (latestSuccessfulImports.length > 0) {
-			logger.info(`there are ${latestSuccessfulImports.length} (most recent) successful imports recorded in the bookkeeping DB: ${latestSuccessfulImports.map(imp => imp.dbName)}`)
+			logger.info(`there are ${latestSuccessfulImports.length} (most recent) successful imports recorded in the bookkeeping DB: ${latestSuccessfulImports.map(imp => imp.schemaName)}`)
 			prevImport = latestSuccessfulImports[0]
 		}
-		logger.debug('all DBs, including old/unfinished imports: ' + allDbs.join(', '))
+		// Although the import's schema will be created atomically (because it runs in a transaction), the import might fail afterwards (e.g. because this file's process is killed), so we might still have not-marked-as-ready imports.
+		logger.debug('all schemas, including old/unfinished imports: ' + allSchemas.join(', '))
 		for (let i = 0; i < latestSuccessfulImports.length; i++) {
 			const prevImport = latestSuccessfulImports[i]
 
-			if (!allDbs.includes(prevImport.dbName)) {
-				logger.warn(`The "${successfulImportsTableName}" table points to a DB "${prevImport.dbName}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
+			if (!allSchemas.includes(prevImport.schemaName)) {
+				logger.warn(`The "${successfulImportsTableName}" table points to a DB "${prevImport.schemaName}" which does not exist. This indicates either a bug in postgis-gtfs-importer, or that its state has been tampered with!`)
 				// remove from list
 				latestSuccessfulImports.splice(i, 1)
 				i--
@@ -159,45 +176,45 @@ const importGtfsAtomically = async (cfg) => {
 		}
 
 		{
-			const dbsToRetain = determineDbsToRetain(latestSuccessfulImports, allDbs)
-			ok(Array.isArray(dbsToRetain), 'determineDbsToRetain() must return an array')
-			logger.debug('dbs to retain: ' + dbsToRetain.join(', '))
-			result.retainedDatabases = dbsToRetain
+			const importsToRetain = determineImportsToRetain(latestSuccessfulImports, allSchemas)
+			ok(Array.isArray(importsToRetain), 'determineImportsToRetain() must return an array')
+			logger.debug('imports to retain: ' + importsToRetain.join(', '))
+			result.retainedSchemas = importsToRetain
 
-			for (const dbName of allDbs) {
-				if (dbsToRetain.includes(dbName)) {
+			for (const schemaName of allSchemas) {
+				if (importsToRetain.includes(schemaName)) {
 					continue;
 				}
-				const isRecentSuccessfulImport = latestSuccessfulImports.some(imp => imp.dbName === dbName)
+				const isRecentSuccessfulImport = latestSuccessfulImports.some(imp => imp.schemaName === schemaName)
 				if (isRecentSuccessfulImport) {
-					logger.info(`dropping database "${dbName}" containing a (recent) successful import`)
+					logger.info(`dropping schema "${schemaName}" containing a (recent) successful import`)
 				} else {
-					logger.info(`dropping database "${dbName}" containing an older or unfinished import`)
+					logger.info(`dropping schema "${schemaName}" containing an older or unfinished import`)
 				}
 
-				// todo: `WITH (FORCE)`? – https://stackoverflow.com/a/68982312/1072129
 				try {
-					await dbMngmtClient.query(pgFormat('DROP DATABASE %I', dbName))
-					result.deletedDatabases.push(dbName)
+					await client.query(pgFormat('DROP SCHEMA %I CASCADE', schemaName))
+					result.deletedSchemas.push(schemaName)
 				} catch (err) {
-					if (continueOnFailureDeletingOldDb) {
+					if (continueOnFailureDeletingOldImport) {
 						logger.warn({
 							error: err,
-							dbName,
-						}, `failed to delete old database "${dbName}"`)
+							schemaName,
+						}, `failed to delete old schema "${schemaName}"`)
 					} else {
 						throw err
 					}
 				}
 				if (isRecentSuccessfulImport) {
-					await removeDbFromLatestSuccessfulImports({
+					await removeImportFromLatestSuccessfulImports({
 						db: client,
-						dbName,
+						schemaName,
 					})
 				}
 			}
 		}
 
+		// todo: also take gtfs-via-postgres version into account
 		const zipDigest = await digestFile(zipPath)
 		let feedDigest = zipDigest
 
@@ -228,8 +245,8 @@ const importGtfsAtomically = async (cfg) => {
 		}
 
 		const importedAt = (Date.now() / 1000 | 0)
-		const dbName = formatDbName({
-			databaseNamePrefix,
+		const schemaName = formatSchemaName({
+			schemaNamePrefix,
 			importedAt,
 			feedDigest,
 		})
@@ -239,20 +256,17 @@ const importGtfsAtomically = async (cfg) => {
 			return result
 		}
 		result.newImport = {
-			dbName,
+			schemaName,
 			importedAt,
 			feedDigest,
 		}
 
-		logger.debug(`creating database "${dbName}"`)
-		await dbMngmtClient.query(pgFormat('CREATE DATABASE %I', dbName))
-
-		logger.info(`importing data into "${dbName}"`)
+		logger.info(`importing data into "${schemaName}"`)
 		const _importEnv = {
 			...process.env,
 			...pgEnv,
 			PATH: NPM_BIN_DIR + ':' + process.env.PATH,
-			PGDATABASE: dbName,
+			GTFS_IMPORTER_SCHEMA: schemaName,
 			GTFS_TMP_DIR: tmpDir,
 			GTFS_IMPORTER_VERBOSE: importScriptVerbose ? 'true' : 'false',
 			GTFS_FEED_DIGEST: feedDigest,
@@ -278,46 +292,34 @@ const importGtfsAtomically = async (cfg) => {
 		result.importDurationMs = performance.now() - _t0Import
 		logger.debug(`import succeeded in ${Math.round(result.importDurationMs / 1000)}s`)
 
-		logger.info(`marking the import into "${dbName}" as the latest`)
+		logger.info(`marking the import into "${schemaName}" as the latest`)
 		await recordSuccessfulImport({
 			db: client,
 			successfulImport: {
-				dbName,
+				schemaName,
 				importedAt,
 				feedDigest,
 			},
 		})
 
-		if (pathToDsnFile !== null) {
-			// https://www.pgbouncer.org/config.html#section-databases
-			// https://www.postgresql.org/docs/15/libpq-connect.html#id-1.7.3.8.3.5
-			const {
-				PGHOST,
-				PGPORT,
-				POSTGREST_USER,
-				POSTGREST_PASSWORD,
-			} = process.env
-			ok(PGHOST, 'missing/empty $PGHOST')
-			ok(PGPORT, 'missing/empty $PGPORT')
-			// todo: why `POSTGREST_`? rename to e.g. `PGBOUNCER_`?
-			ok(POSTGREST_USER, 'missing/empty $POSTGREST_USER')
-			ok(POSTGREST_PASSWORD, 'missing/empty $POSTGREST_PASSWORD')
-
-			const dsn = `gtfs=host=${PGHOST} port=${PGPORT} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD}`
-			const logDsn = `gtfs=host=${PGHOST} port=${PGPORT} dbname=${dbName} user=${POSTGREST_USER} password=${POSTGREST_PASSWORD.slice(0, 2)}…${POSTGREST_PASSWORD.slice(-2)}`
-			logger.debug(`writing "${logDsn}" into env file ${pathToDsnFile}`)
-			await writeFile(pathToDsnFile, dsn)
+		if (pathToEnvFile !== null) {
+			const env = `\
+GTFS_DB_SCHEMA="${schemaName}"
+`
+			logger.debug(`writing env file ${pathToEnvFile}`)
+			await writeFile(pathToEnvFile, env)
 		}
 
 		logger.info(`import succeeded, committing all changes to "${successfulImportsTableName}"!`)
+		// also releases the lock on latest_successful_imports_v2
 		await client.query('COMMIT')
 	} catch (err) {
 		logger.warn('an error occured, rolling back')
 		// The newly created DB will remain, potentially with data inside. But it will be cleaned up during the next run.
+		// also releases the lock on latest_successful_imports_v2
 		await client.query('ROLLBACK')
 		throw err
 	} finally {
-		dbMngmtClient.end()
 		client.end()
 	}
 
