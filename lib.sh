@@ -8,8 +8,13 @@ print_bold () {
 	fi
 }
 
+verbose="${GTFS_IMPORTER_VERBOSE:-true}"
+
 gtfs_tmp_dir="${GTFS_TMP_DIR:-/tmp/gtfs}"
 
 zip_path="$gtfs_tmp_dir/gtfs.zip"
-extracted_path="$gtfs_tmp_dir/gtfs"
-tidied_path="$gtfs_tmp_dir/tidied.gtfs"
+
+psql_args=()
+if [ "$verbose" = false ]; then
+	psql_args+=('--quiet')
+fi

@@ -10,15 +10,15 @@ The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.co
 
 First, the GTFS data is downloaded to, unzipped into and [cleaned](https://github.com/public-transport/gtfsclean) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
 
-**Each GTFS import gets its own PostgreSQL database** called `$GTFS_IMPORTER_DB_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of (the most recent) successful imports by – once an import has succeeded – writing its DB name into a table `latest_successful_imports` within a "meta bookkeeping database".
+**Each GTFS import gets its own [PostgreSQL schema](https://www.postgresql.org/docs/16/ddl-schemas.html)** called `$GTFS_IMPORTER_SCHEMA_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of (the most recent) successful imports by – once an import has succeeded – writing its schema name into a "bookkeeping" table `$GTFS_IMPORTER_SCHEMA.latest_successful_imports_v2`.
 
 The newly downloaded GTFS data will only get imported if it has changed since the last import. This is determined using a [SHA-256 digest](https://en.wikipedia.org/wiki/SHA-2) of the GTFS dataset (and of the post-processing scripts, if configured, see below).
 
 Before each import, it also **deletes all imports but the most recent two** successful ones; This ensures that your disk won't overflow, but also that a rollback to the previous import is always possible.
 
-Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/16/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/16/explicit-locking.html) on on `latest_successful_imports` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel. Because creating and deleting DBs is *not* possible within a transaction, the importer opens a separate DB connection to do that; Therefore, aborting an import might leave an empty DB (not marked as the latest yet), which will be cleaned up as part of the next import (see above).
+Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/16/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/16/explicit-locking.html) on on `latest_successful_imports_v2` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel.
 
-After the GTFS has been imported but before the import is marked as successful, it will run all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`), if provided. This way, you can customise or augment the imported data. The execution of these scripts happens within the same transaction (in the bookkeeping DB) as the GTFS import. Files ending in `.sql` will be run using `psql`, all other files are assumed to be executable scripts. Note that the post-processing scripts also get hashed into the `$sha256_digest`, so if they change, the GTFS data will be imported again.
+As part of the GTFS import, all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`) will be run, if provided. This way, you can customise or augment the imported data. They are executed within the same transaction as the main GTFS import, so make sure *not to* use transaction commands (`COMMIT`/`ROLLBACK`) in your scripts! Files ending in `.sql` will be run using `psql`, all other files are assumed to be executable scripts. Note that the post-processing scripts also get hashed into the `$sha256_digest`, so if they change, the GTFS data will be imported again.
 
 
 ## Usage
@@ -28,7 +28,7 @@ After the GTFS has been imported but before the import is marked as successful, 
 
 ### Prerequisites
 
-You can configure access to the bookkeeping DB using the [standard `$PG…` environment variables](https://www.postgresql.org/docs/16/libpq-envars.html).
+You can configure access to the DB using the [standard `$PG…` environment variables](https://www.postgresql.org/docs/16/libpq-envars.html).
 
 ```shell
 export PGDATABASE='…'
@@ -36,7 +36,8 @@ export PGUSER='…'
 # …
 ```
 
-*Note:* `postgis-gtfs-importer` requires a database user/role that is [allowed](https://www.postgresql.org/docs/16/sql-alterrole.html) to create new databases (`CREATEDB` privilege).
+> [!IMPORTANT]
+> `postgis-gtfs-importer` requires a database user/role that is [allowed](https://www.postgresql.org/docs/16/sql-alterrole.html) to create new schemas (`CREATE` privilege).
 
 ### Importing Data
 
@@ -48,13 +49,12 @@ docker run --rm -it \
 	-v $PWD/gtfs-tmp:/tmp/gtfs \
 	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
 	-e 'GTFS_DOWNLOAD_URL=…' \
-	-e 'GTFS_IMPORTER_DB_PREFIX=my_feed' \
+	-e 'GTFS_IMPORTER_SCHEMA_PREFIX=my_feed' \
 	ghcr.io/mobidata-bw/postgis-gtfs-importer:v8
 ```
 
-*Note:* We mount a `gtfs-tmp` directory to prevent it from re-downloading the GTFS dataset every time, even when it hasn't changed.
-
-You can configure access to the PostgreSQL by passing the [standard `PG*` environment variables](https://www.postgresql.org/docs/16/libpq-envars.html) into the container.
+> [!TIP]
+> To prevent `postgis-gtfs-importer` from re-downloading the GTFS dataset *every time*, even when it hasn't changed, mount a directory at `/tmp/gtfs`.
 
 If you run with `GTFSTIDY_BEFORE_IMPORT=false`, [gtfsclean](https://github.com/public-transport/gtfsclean) (a fork of [gtfstidy](https://github.com/patrickbr/gtfstidy)) will not be used.
 
@@ -66,11 +66,11 @@ You can pass additional options to the underlying [`gtfs-to-sql`](https://github
 
 Keep in mind that `\` characters in `$GTFS_TO_SQL_ADDITIONAL_ARGS` will be interpreted because the variable is processed using Bash's `read` *without* the `-r` flag. For example, setting `GTFS_TO_SQL_ADDITIONAL_ARGS='--foo bar\ baz'` will pass *two* arguments `--foo` & `bar baz` to `gtfs-to-sql`.
 
-### writing a DSN file
+### writing an env file
 
-If you set `$PATH_TO_DSN_FILE` to a file path, the importer will also write a [PostgreSQL key/value connection string (DSN)](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) to that path. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
+If you set `$GTFS_IMPORTER_ENV_FILE` to a file path, the importer will also write an env file to that path, assigning the new import's schema name to `$GTFS_DB_SCHEMA`. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
 
-This feature is intended to be used with [PgBouncer](https://pgbouncer.org) for "dynamic" routing of PostgreSQL clients to the database containing the latest GTFS import.
+This feature allows PostgreSQL clients to always connect to the schema containing the latest GTFS import.
 
 ### Breaking Changes
 

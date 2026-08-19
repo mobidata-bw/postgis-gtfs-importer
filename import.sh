@@ -6,14 +6,14 @@ set -o pipefail
 
 source "$(dirname "$(realpath "$0")")/lib.sh"
 
-gtfs_path=''
+export gtfs_path=''
 
-postprocessing_d_path="${GTFS_POSTPROCESSING_D_PATH:?missing/empty}"
-
-verbose="${GTFS_IMPORTER_VERBOSE:-true}"
 if [ "$verbose" != false ]; then
 	set -x # enable xtrace
 fi
+
+extracted_path="$gtfs_tmp_dir/gtfs"
+tidied_path="$gtfs_tmp_dir/tidied.gtfs"
 
 print_bold "Extracting the GTFS feed."
 
@@ -115,42 +115,12 @@ print_bold "Importing GTFS feed into the $PGDATABASE database."
 gtfs-to-sql --version
 
 psql_args=()
-gtfs_to_sql_args=()
 if [ "$verbose" = false ]; then
 	psql_args+=('--quiet')
-	gtfs_to_sql_args+=('--silent')
 fi
-# e.g. GTFS_TO_SQL_ADDITIONAL_ARGS='--route-types-scheme google-extended' for Swiss GTFS feeds
-read -a gtfs_to_sql_additional_args <<< "${GTFS_TO_SQL_ADDITIONAL_ARGS:-}"
 
-gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
-	--trips-without-shape-id --lower-case-lang-codes \
-	--stops-location-index \
-	--import-metadata \
-	--schema "${GTFS_IMPORTER_SCHEMA:-public}" \
-	--postgrest \
-	"${gtfs_to_sql_additional_args[@]}" \
-	"$gtfs_path/"*.txt \
+./import-sql.sh \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1' "${psql_args[@]}"
-
-if [ -d "$postprocessing_d_path" ]; then
-	print_bold "Running custom post-processing scripts in $postprocessing_d_path."
-	# Bash exits with `1` if the option is currently not set.
-	prev_nullglob="$(shopt -p nullglob || true)"
-	shopt -s nullglob
-	# todo: DRY this with the hash calculation in import.js
-	for file in "$postprocessing_d_path/"*; do
-		ext="${file##*.}"
-		if [ "$ext" = "sql" ]; then
-			psql -b -1 -v 'ON_ERROR_STOP=1' --set=SHELL="$SHELL" "${psql_args[@]}" \
-				-f "$file"
-		else
-			"$file" "$gtfs_path"
-		fi
-	done
-	# reset `nullglob` to previous setting
-	eval "$prev_nullglob"
-fi
 
 print_bold 'Done!'

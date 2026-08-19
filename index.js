@@ -9,6 +9,7 @@ import {ok} from 'node:assert'
 
 // Note: We keep compatibility with the "GTFS-RT content negotiation for multiple Schedule feeds" proposal here.
 // see also https://gist.github.com/derhuerst/f0b6c9cf28b90746770464eb8e5b918f
+// see also https://github.com/public-transport/gtfs-via-postgres/blob/4.12.0/lib/import_metadata.js#L10
 const DIGEST_LENGTH = 8
 
 const digestString = (str) => {
@@ -54,9 +55,9 @@ const pSpawn = (path, args = [], opts = {}) => {
 	})
 }
 
-const formatDbName = ({databaseNamePrefix, importedAt, feedDigest}) => {
+const formatSchemaName = ({schemaNamePrefix, importedAt, feedDigest}) => {
 	return [
-		databaseNamePrefix,
+		schemaNamePrefix,
 		importedAt,
 		'_',
 		feedDigest,
@@ -113,12 +114,12 @@ const getPgConfig = async (cfg) => {
 	return pgConfig
 }
 
-const connectToMetaDatabase = async (cfg) => {
-	const pgConfig = await getPgConfig(cfg)
-	const db = new Client(pgConfig)
-	await db.connect()
+const connectToDatabase = async (cfg) => {
+        const pgConfig = await getPgConfig(cfg)
+        const db = new Client(pgConfig)
+        await db.connect()
 
-	return db
+        return db
 }
 
 // https://www.postgresql.org/docs/15/libpq-connect.html#id-1.7.3.8.3.5
@@ -146,55 +147,52 @@ const getPgEnv = async (pgConfig) => {
 	return pgConfig
 }
 
-const successfulImportsTableName = 'latest_successful_imports'
+const successfulImportsTableName = 'latest_successful_imports_v2'
 
 const ensureSuccesfulImportsTableExists = async (cfg) => {
 	const {
 		db,
+		schemaName,
 	} = cfg
 	ok(cfg.db, 'missing/empty cfg.db')
+	ok(cfg.schemaName, 'missing/empty cfg.schemaName')
 
-	await db.query(`\
-		CREATE TABLE IF NOT EXISTS ${successfulImportsTableName} (
-			db_name TEXT PRIMARY KEY,
+	await db.query(pgFormat(`\
+		CREATE TABLE IF NOT EXISTS %I.%I (
+			schema_name TEXT PRIMARY KEY,
 			imported_at INTEGER NOT NULL, -- UNIX timestamp
 			feed_digest TEXT NOT NULL
 		)
-	`)
+	`, schemaName, successfulImportsTableName))
 }
 
 const queryImports = async (cfg) => {
 	const {
-		databaseNamePrefix,
+		db,
+		schemaNamePrefix,
 	} = cfg
-	ok(databaseNamePrefix, 'missing/empty cfg.databaseNamePrefix')
-	let db
-	if ('db' in cfg) {
-		ok(cfg.db, 'missing/empty cfg.db')
-		db = cfg.db
-	} else {
-		db = await connectToMetaDatabase(cfg)
-	}
+	ok(db, 'missing/empty cfg.db')
+	ok(schemaNamePrefix, 'missing/empty cfg.schemaNamePrefix')
 
 	let latestSuccessfulImports = []
-	let allDbs
+	let allSchemas
 	try {
 		// todo: use pg-format?
 		const {
 			rows: _rows,
 		} = await db.query(`\
 			SELECT
-				db_name,
+				schema_name,
 				imported_at,
 				feed_digest
 			FROM ${successfulImportsTableName}
-			WHERE substring(db_name FOR character_length($1)) = $1
+			WHERE substring(schema_name FOR character_length($1)) = $1
 			ORDER BY imported_at DESC
 		`, [
-			databaseNamePrefix,
+			schemaNamePrefix,
 		])
 		latestSuccessfulImports = _rows.map(row => ({
-			dbName: row.db_name,
+			schemaName: row.schema_name,
 			importedAt: row.imported_at,
 			feedDigest: row.feed_digest,
 		}))
@@ -210,21 +208,20 @@ const queryImports = async (cfg) => {
 			rows: _rows,
 		} = await db.query(`\
 			SELECT
-				datname AS db_name
-			FROM pg_catalog.pg_database
-			WHERE substring(datname FOR character_length($1)) = $1
-			ORDER BY datname ASC
+				nspname AS schema_name
+			FROM pg_namespace
+			WHERE substring(nspname FOR character_length($1)) = $1
+			ORDER BY nspname ASC
 		`, [
-			databaseNamePrefix,
+			schemaNamePrefix,
 		])
-		allDbs = _rows
-		.map(row => row.db_name)
-		.filter(dbName => dbName !== db.database) // omit meta "bookkeeping" database
+		allSchemas = _rows
+		.map(row => row.schema_name)
 	}
 
 	return {
 		latestSuccessfulImports,
-		allDbs,
+		allSchemas,
 	}
 }
 
@@ -232,44 +229,44 @@ const recordSuccessfulImport = async (cfg) => {
 	const {
 		db,
 		successfulImport: {
-			dbName,
+			schemaName,
 			importedAt,
 			feedDigest,
 		},
 	} = cfg
 	ok(db, 'missing/empty cfg.db')
-	ok(dbName, 'missing/empty cfg.successful.dbName')
+	ok(schemaName, 'missing/empty cfg.successful.schemaName')
 	ok(importedAt, 'missing/empty cfg.successful.importedAt')
 	ok(feedDigest, 'missing/empty cfg.successful.feedDigest')
 
 	await db.query(
 		pgFormat(`\
-			INSERT INTO %I (db_name, imported_at, feed_digest)
+			INSERT INTO %I (schema_name, imported_at, feed_digest)
 			VALUES ($1, $2, $3)
 		`, successfulImportsTableName),
 		[
-			dbName,
+			schemaName,
 			importedAt,
 			feedDigest,
 		],
 	)
 }
 
-const removeDbFromLatestSuccessfulImports = async (cfg) => {
+const removeImportFromLatestSuccessfulImports = async (cfg) => {
 	const {
 		db,
-		dbName,
+		schemaName,
 	} = cfg
 	ok(db, 'missing/empty cfg.db')
-	ok(dbName, 'missing/empty cfg.dbName')
+	ok(schemaName, 'missing/empty cfg.schemaName')
 
 	await db.query(
 		pgFormat(`\
 			DELETE FROM %I
-			WHERE db_name = $1
+			WHERE schema_name = $1
 		`, successfulImportsTableName),
 		[
-			dbName,
+			schemaName,
 		],
 	)
 }
@@ -278,13 +275,13 @@ export {
 	digestString,
 	digestFile,
 	pSpawn,
-	formatDbName,
+	formatSchemaName,
 	getPgEnv,
 	getPgConfig,
-	connectToMetaDatabase,
+	connectToDatabase,
 	successfulImportsTableName,
 	ensureSuccesfulImportsTableExists,
 	queryImports,
 	recordSuccessfulImport,
-	removeDbFromLatestSuccessfulImports,
+	removeImportFromLatestSuccessfulImports,
 }
