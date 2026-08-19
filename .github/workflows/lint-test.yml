@@ -17,6 +17,7 @@ jobs:
       matrix:
         node-version:
           - '24'
+          - '26'
     steps:
     - name: checkout
       uses: actions/checkout@v7
