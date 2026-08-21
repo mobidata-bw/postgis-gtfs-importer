@@ -9,12 +9,16 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 ua="${GTFS_DOWNLOAD_USER_AGENT:?'missing/empty $GTFS_DOWNLOAD_USER_AGENT'}"
 gtfs_url="${GTFS_DOWNLOAD_URL:?'missing/empty $GTFS_DOWNLOAD_URL'}"
 
-verbose="${GTFS_DOWNLOAD_VERBOSE:-true}"
 if [ "$verbose" != false ]; then
 	set -x # enable xtrace
 fi
 
 print_bold "Downloading the GTFS feed from $GTFS_DOWNLOAD_URL."
+
+curl_mirror_flags=()
+if [ "$verbose" = true ]; then
+	curl_mirror_flags+=('--debug-curl')
+fi
 
 mkdir -p "$gtfs_tmp_dir"
 
@@ -25,5 +29,6 @@ mkdir -p "$gtfs_tmp_dir"
 curl-mirror \
 	--tmp-prefix "$zip_path.mirror-" \
 	"$gtfs_url" "$zip_path" \
+	"${curl_mirror_flags[@]}" \
 	-- \
 	-H "User-Agent: $ua"

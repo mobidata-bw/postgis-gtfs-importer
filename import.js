@@ -59,7 +59,7 @@ const importGtfsAtomically = async (cfg) => {
 		// gtfsPostImportDPath,
 	} = {
 		logger: console,
-		downloadScriptVerbose: true,
+		downloadScriptVerbose: false,
 		connectDownloadScriptToStdout: true,
 		importScriptVerbose: true,
 		connectImportScriptToStdout: true,
@@ -113,7 +113,7 @@ const importGtfsAtomically = async (cfg) => {
 			GTFS_TMP_DIR: tmpDir,
 			GTFS_DOWNLOAD_URL: gtfsDownloadUrl,
 			GTFS_DOWNLOAD_USER_AGENT: gtfsDownloadUserAgent,
-			GTFS_DOWNLOAD_VERBOSE: downloadScriptVerbose ? 'true' : 'false',
+			GTFS_IMPORTER_VERBOSE: downloadScriptVerbose ? 'true' : 'false',
 		},
 	})
 	result.downloadDurationMs = performance.now() - _t0Download
