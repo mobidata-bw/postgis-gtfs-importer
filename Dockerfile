@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.23
+# syntax=docker/dockerfile:1.27
 # ^ needed for ADD --checksum=…
 
 FROM golang:1-alpine AS gtfsclean
