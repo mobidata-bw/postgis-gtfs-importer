@@ -1,6 +1,6 @@
 # PostGIS GTFS importer
 
-This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. It allows running a production service (e.g. an API) on top of programmatically re-imported data from a periodically changing GTFS feed without downtime.
+This tool **imports [GTFS Schedule](https://gtfs.org/schedule/) data into a [PostGIS](https://postgis.net) database using [`gtfs-via-postgres`](https://github.com/public-transport/gtfs-via-postgres)**. It allows running a production service (e.g. an API) from an often-changing GTFS feed by re-importing it without downtime.
 
 Because it works as [atomically](https://en.wikipedia.org/wiki/Atomicity_(database_systems)) as possible with PostgreSQL, it makes the import pipeline *robust*, even if an import fails or if simultaneous imports get started.
 
@@ -10,13 +10,11 @@ The [`ghcr.io/mobidata-bw/postgis-gtfs-importer` Docker image](https://github.co
 
 First, the GTFS data is downloaded to, unzipped into and [cleaned](https://github.com/public-transport/gtfsclean) within `/tmp/gtfs`; You can specify a custom path using `$GTFS_TMP_DIR`.
 
-**Each GTFS import gets its own [PostgreSQL schema](https://www.postgresql.org/docs/16/ddl-schemas.html)** called `$GTFS_IMPORTER_SCHEMA_PREFIX_$unix_timestamp_$sha256_digest`. The importer keeps track of (the most recent) successful imports by – once an import has succeeded – writing its schema name into a "bookkeeping" table `$GTFS_IMPORTER_SCHEMA.latest_successful_imports_v2`.
-
 The newly downloaded GTFS data will only get imported if it has changed since the last import. This is determined using a [SHA-256 digest](https://en.wikipedia.org/wiki/SHA-2) of the GTFS dataset (and of the post-processing scripts, if configured, see below).
 
-Before each import, it also **deletes all imports but the most recent two** successful ones; This ensures that your disk won't overflow, but also that a rollback to the previous import is always possible.
+**Each GTFS import runs in a transaction, writing into a temporary schema `GTFS_IMPORTER_SCHEMA_tmp`, which then gets renamed to `$GTFS_IMPORTER_SCHEMA`. It should be safe to abort an import at any time.**
 
-Because the entire import script runs in a [transaction](https://www.postgresql.org/docs/16/tutorial-transactions.html), and because it acquires an exclusive [lock](https://www.postgresql.org/docs/16/explicit-locking.html) on on `latest_successful_imports_v2` in the beginning, it **should be safe to abort an import at any time**, or to (accidentally) run more than one process in parallel.
+Because `postgis-gtfs-importer` acquires an exclusive [advisory lock](https://www.postgresql.org/docs/16/explicit-locking.html#ADVISORY-LOCKS) on `sha256(gtfs_importer_$GTFS_IMPORTER_SCHEMA)` in the beginning, and aborts if that fails, no more than one import should run in parallel.
 
 As part of the GTFS import, all post-processing scripts in `/etc/gtfs/postprocessing.d` (this path can be changed using `$GTFS_POSTPROCESSING_D_PATH`) will be run, if provided. This way, you can customise or augment the imported data. They are executed within the same transaction as the main GTFS import, so make sure *not to* use transaction commands (`COMMIT`/`ROLLBACK`) in your scripts! Files ending in `.sql` will be run using `psql`, all other files are assumed to be executable scripts. Note that the post-processing scripts also get hashed into the `$sha256_digest`, so if they change, the GTFS data will be imported again.
 
@@ -49,7 +47,7 @@ docker run --rm -it \
 	-v $PWD/gtfs-tmp:/tmp/gtfs \
 	-e 'GTFS_DOWNLOAD_USER_AGENT=…' \
 	-e 'GTFS_DOWNLOAD_URL=…' \
-	-e 'GTFS_IMPORTER_SCHEMA_PREFIX=my_feed' \
+	-e 'GTFS_IMPORTER_SCHEMA=my_feed' \
 	ghcr.io/mobidata-bw/postgis-gtfs-importer:v8
 ```
 
@@ -71,12 +69,6 @@ You can pass additional options to the underlying [`gtfs-to-sql`](https://github
 ```
 
 Keep in mind that `\` characters in `$GTFS_TO_SQL_ADDITIONAL_ARGS` will be interpreted because the variable is processed using Bash's `read` *without* the `-r` flag. For example, setting `GTFS_TO_SQL_ADDITIONAL_ARGS='--foo bar\ baz'` will pass *two* arguments `--foo` & `bar baz` to `gtfs-to-sql`.
-
-### writing an env file
-
-If you set `$GTFS_IMPORTER_ENV_FILE` to a file path, the importer will also write an env file to that path, assigning the new import's schema name to `$GTFS_DB_SCHEMA`. Note that you must also provide `$POSTGREST_USER` & `$POSTGREST_PASSWORD` in this case.
-
-This feature allows PostgreSQL clients to always connect to the schema containing the latest GTFS import.
 
 ### Breaking Changes
 
