@@ -118,6 +118,9 @@ if [ "$verbose" = false ]; then
 	psql_args+=('--quiet')
 fi
 
+export GTFS_IMPORTER_FINAL_DB_SCHEMA="${GTFS_IMPORTER_SCHEMA:?missing/empty}"
+export GTFS_IMPORTER_SCHEMA="${GTFS_IMPORTER_SCHEMA}_tmp"
+
 ./import-sql.sh \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1' "${psql_args[@]}"

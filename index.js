@@ -9,8 +9,8 @@ import {ok} from 'node:assert'
 
 // > 3F000 – invalid_schema_name
 const PG_ERROR_INVALID_SCHEMA_NAME = '3F000'
-// > 42P01 – undefined_table
-const PG_ERROR_UNDEFINED_TABLE = '42P01'
+// > 42883 – undefined_function
+const PG_ERROR_UNDEFINED_FUNCTION = '42883'
 
 // Note: We keep compatibility with the "GTFS-RT content negotiation for multiple Schedule feeds" proposal here.
 // see also https://gist.github.com/derhuerst/f0b6c9cf28b90746770464eb8e5b918f
@@ -58,15 +58,6 @@ const pSpawn = (path, args = [], opts = {}) => {
 			stopListening()
 		})
 	})
-}
-
-const formatSchemaName = ({schemaNamePrefix, importedAt, feedDigest}) => {
-	return [
-		schemaNamePrefix,
-		importedAt,
-		'_',
-		feedDigest,
-	].join('')
 }
 
 const getPgConfig = async (cfg) => {
@@ -152,112 +143,7 @@ const getPgEnv = async (pgConfig) => {
 	return pgConfig
 }
 
-const successfulImportsTableName = 'latest_successful_imports_v2'
-
-const ensureSuccesfulImportsTableExists = async (cfg) => {
-	const {
-		db,
-		schemaName,
-	} = cfg
-	ok(cfg.db, 'missing/empty cfg.db')
-	ok(cfg.schemaName, 'missing/empty cfg.schemaName')
-
-	await db.query(pgFormat(`\
-		CREATE TABLE IF NOT EXISTS %I.%I (
-			schema_name TEXT PRIMARY KEY,
-			imported_at INTEGER NOT NULL, -- UNIX timestamp
-			feed_digest TEXT NOT NULL
-		)
-	`, schemaName, successfulImportsTableName))
-}
-
-const queryImports = async (cfg) => {
-	const {
-		db,
-		schemaNamePrefix,
-	} = cfg
-	ok(db, 'missing/empty cfg.db')
-	ok(schemaNamePrefix, 'missing/empty cfg.schemaNamePrefix')
-
-	let latestSuccessfulImports = []
-	let allSchemas
-	try {
-		// todo: use pg-format?
-		const {
-			rows: _rows,
-		} = await db.query(`\
-			SELECT
-				schema_name,
-				imported_at,
-				feed_digest
-			FROM ${successfulImportsTableName}
-			WHERE substring(schema_name FOR character_length($1)) = $1
-			ORDER BY imported_at DESC
-		`, [
-			schemaNamePrefix,
-		])
-		latestSuccessfulImports = _rows.map(row => ({
-			schemaName: row.schema_name,
-			importedAt: row.imported_at,
-			feedDigest: row.feed_digest,
-		}))
-	} catch (err) {
-		if (err.code !== PG_ERROR_INVALID_SCHEMA_NAME && err.code !== PG_ERROR_UNDEFINED_TABLE) {
-			throw err
-		}
-	}
-
-	{
-		// todo: use pg-format?
-		const {
-			rows: _rows,
-		} = await db.query(`\
-			SELECT
-				nspname AS schema_name
-			FROM pg_namespace
-			WHERE substring(nspname FOR character_length($1)) = $1
-			ORDER BY nspname ASC
-		`, [
-			schemaNamePrefix,
-		])
-		allSchemas = _rows
-		.map(row => row.schema_name)
-	}
-
-	return {
-		latestSuccessfulImports,
-		allSchemas,
-	}
-}
-
-const recordSuccessfulImport = async (cfg) => {
-	const {
-		db,
-		successfulImport: {
-			schemaName,
-			importedAt,
-			feedDigest,
-		},
-	} = cfg
-	ok(db, 'missing/empty cfg.db')
-	ok(schemaName, 'missing/empty cfg.successful.schemaName')
-	ok(importedAt, 'missing/empty cfg.successful.importedAt')
-	ok(feedDigest, 'missing/empty cfg.successful.feedDigest')
-
-	await db.query(
-		pgFormat(`\
-			INSERT INTO %I (schema_name, imported_at, feed_digest)
-			VALUES ($1, $2, $3)
-		`, successfulImportsTableName),
-		[
-			schemaName,
-			importedAt,
-			feedDigest,
-		],
-	)
-}
-
-const removeImportFromLatestSuccessfulImports = async (cfg) => {
+const queryPreviousImport = async (cfg) => {
 	const {
 		db,
 		schemaName,
@@ -265,28 +151,41 @@ const removeImportFromLatestSuccessfulImports = async (cfg) => {
 	ok(db, 'missing/empty cfg.db')
 	ok(schemaName, 'missing/empty cfg.schemaName')
 
-	await db.query(
-		pgFormat(`\
-			DELETE FROM %I
-			WHERE schema_name = $1
-		`, successfulImportsTableName),
-		[
-			schemaName,
-		],
-	)
+	try {
+		const {
+			rows: [{
+				imported_at: importedAt,
+				feed_digest: feedDigest,
+			}],
+		} = await db.query(
+			pgFormat(`\
+				SELECT
+					%I.gtfs_data_imported_at () AS imported_at,
+					%I.gtfs_feed_digest () AS feed_digest
+			`, schemaName, schemaName),
+		)
+		return {
+			importedAt,
+			feedDigest,
+		}
+	} catch (err) {
+		// If the schema or function does not exist, no import has been done, so we can continue.
+		if (
+			err.code === PG_ERROR_INVALID_SCHEMA_NAME
+			|| err.code === PG_ERROR_UNDEFINED_FUNCTION
+		) {
+			return null
+		}
+		throw err
+	}
 }
 
 export {
 	digestString,
 	digestFile,
 	pSpawn,
-	formatSchemaName,
 	getPgEnv,
 	getPgConfig,
 	connectToDatabase,
-	successfulImportsTableName,
-	ensureSuccesfulImportsTableExists,
-	queryImports,
-	recordSuccessfulImport,
-	removeImportFromLatestSuccessfulImports,
+	queryPreviousImport,
 }
