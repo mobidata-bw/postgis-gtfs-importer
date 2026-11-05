@@ -19,6 +19,8 @@ curl_mirror_flags=()
 if [ "$verbose" = true ]; then
 	curl_mirror_flags+=('--debug-curl')
 fi
+# e.g. CURL_MIRROR_ADDITIONAL_ARGS='--header X-Foo:\ Bar'
+read -a curl_additional_args <<< "${CURL_MIRROR_ADDITIONAL_ARGS:-}"
 
 mkdir -p "$gtfs_tmp_dir"
 
@@ -31,4 +33,5 @@ curl-mirror \
 	"$gtfs_url" "$zip_path" \
 	"${curl_mirror_flags[@]}" \
 	-- \
-	-H "User-Agent: $ua"
+	-H "User-Agent: $ua" \
+	"${curl_mirror_additional_args[@]}"

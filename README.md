@@ -58,6 +58,12 @@ docker run --rm -it \
 
 If you run with `GTFSTIDY_BEFORE_IMPORT=false`, [gtfsclean](https://github.com/public-transport/gtfsclean) (a fork of [gtfstidy](https://github.com/patrickbr/gtfstidy)) will not be used.
 
+You can pass additional options to the underlying [`curl-mirror`](https://gist.github.com/derhuerst/745cf09fe5f3ea2569948dd215bbfe1a) command (and therefore to `curl`) using `$CURL_MIRROR_ADDITIONAL_ARGS`, e.g. to send custom HTTP headers:
+
+```shell
+-e 'CURL_MIRROR_ADDITIONAL_ARGS=--header "X-Foo: Bar"'
+```
+
 You can pass additional options to the underlying [`gtfs-to-sql`](https://github.com/public-transport/gtfs-via-postgres) command using `$GTFS_TO_SQL_ADDITIONAL_ARGS`, e.g. to import a GTFS feed using [extended route types](https://developers.google.com/transit/gtfs/reference/extended-route-types) (as used e.g. by Swiss GTFS feeds):
 
 ```shell
