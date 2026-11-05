@@ -130,6 +130,7 @@ gtfs-to-sql -d "${gtfs_to_sql_args[@]}" \
 	--schema "${GTFS_IMPORTER_SCHEMA:-public}" \
 	--postgrest \
 	"${gtfs_to_sql_additional_args[@]}" \
+	--route-types-scheme google-extended \
 	"$gtfs_path/"*.txt \
 	| zstd | sponge | zstd -d \
 	| psql -b -v 'ON_ERROR_STOP=1' "${psql_args[@]}"
