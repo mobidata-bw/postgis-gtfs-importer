@@ -7,6 +7,11 @@ const {Client} = _pg
 import pgFormat from 'pg-format'
 import {ok} from 'node:assert'
 
+// > 3F000 – invalid_schema_name
+const PG_ERROR_INVALID_SCHEMA_NAME = '3F000'
+// > 42P01 – undefined_table
+const PG_ERROR_UNDEFINED_TABLE = '42P01'
+
 // Note: We keep compatibility with the "GTFS-RT content negotiation for multiple Schedule feeds" proposal here.
 // see also https://gist.github.com/derhuerst/f0b6c9cf28b90746770464eb8e5b918f
 // see also https://github.com/public-transport/gtfs-via-postgres/blob/4.12.0/lib/import_metadata.js#L10
@@ -197,7 +202,7 @@ const queryImports = async (cfg) => {
 			feedDigest: row.feed_digest,
 		}))
 	} catch (err) {
-		if (err.message !== `relation "${successfulImportsTableName}" does not exist`) {
+		if (error.code !== PG_ERROR_INVALID_SCHEMA_NAME && error.code !== PG_ERROR_UNDEFINED_TABLE) {
 			throw err
 		}
 	}
