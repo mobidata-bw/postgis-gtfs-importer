@@ -109,12 +109,20 @@ const importGtfsAtomically = async (cfg) => {
 	try {
 		const lockId = digestString('gtfs_importer_' + schemaName)
 		logger.info(`obtaining exclusive advisory lock on ${lockId}, so that only one import can be running`)
-		await client.query(
-			'SELECT pg_advisory_xact_lock($1)',
+		const {
+			rows: [{
+				lock_acquired,
+			}],
+		} = await client.query(
+			'SELECT pg_try_advisory_xact_lock($1) AS lock_acquired',
 			[
 				'0x' + lockId,
 			],
 		)
+		if (!lock_acquired) {
+			logger.warn(`failed to acquire exclude advisory lock on ${lockId}, aborting`)
+			return result
+		}
 
 		logger.debug(`trying to read the previous import's metadata`)
 		const prevImport = await queryPreviousImport({
