@@ -61,8 +61,7 @@ if [ "${GTFSTIDY_BEFORE_IMPORT:-true}" != false ]; then
 	fi
 
 	# minimization
-	# todo: default to true once https://github.com/public-transport/gtfsclean/issues/12 is fixed
-	if [ "${GTFSTIDY_KEEP_ADDITIONAL_FIELDS:-false}" == true ]; then
+	if [ "${GTFSTIDY_KEEP_ADDITIONAL_FIELDS:-true}" == true ]; then
 		gtfstidy_args+=('--keep-additional-fields') # -F
 	fi
 	if [ "${GTFSTIDY_KEEP_IDS:-true}" != false ]; then
