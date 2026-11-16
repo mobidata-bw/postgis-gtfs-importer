@@ -3,7 +3,7 @@ name: build & publish Docker image
 on:
   push:
     branches:
-      - v8
+      # - v8
 
 jobs:
   lint-test:
